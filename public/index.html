@@ -134,6 +134,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 .help ol{margin:.5rem 0 0;padding-left:1.1rem}
 .help li{margin-bottom:.5rem}
+.diag{
+  font-size:.58rem;color:var(--dim);margin:.7rem 0 0;
+  word-break:break-word;opacity:.8;
+}
 /* with no distance to show, the address carries the screen */
 #walk.nofix .addr{font-size:clamp(1.8rem,9vw,2.5rem);margin-top:0}
 .pickedtag{
@@ -598,6 +602,9 @@ let picked = null;       // site id chosen from the map, overrides "nearest"
 let map = null, layer = null;
 let showHelp = false;    // location recovery steps expanded
 let geoTried = false;    // user has pressed "turn on location" at least once
+let permState = null;    // what navigator.permissions reports, when supported
+let lastGeoErr = null;   // {code, message, ms} of the most recent failure
+let triedCoarse = false; // fell back to a coarse fix after a high-accuracy miss
 
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -624,30 +631,42 @@ const isPicked = () => { const t = target(); return !!(picked && t && t.id === p
 /* ============================================================
    LOCATION + COMPASS
    ============================================================ */
-function startGeo(){
+function startGeo({ coarse = false } = {}){
   if (!navigator.geolocation){ geo = 'unsupported'; renderWalk(); return; }
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   const asked = Date.now();
+  if (!coarse) triedCoarse = false;
   geo = 'locating'; renderWalk();
   watchId = navigator.geolocation.watchPosition(
     pos => {
       me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       accuracy = pos.coords.accuracy;
-      geo = 'on';
+      geo = 'on'; lastGeoErr = null;
       if (tab === 'walk') renderWalk();
       if (tab === 'map') renderMap();
     },
     err => {
       me = null;
+      const ms = Date.now() - asked;
+      lastGeoErr = { code: err.code, message: err.message || '', ms };
       // 1 PERMISSION_DENIED · 2 POSITION_UNAVAILABLE · 3 TIMEOUT
       geo = err.code === 1 ? 'blocked' : err.code === 3 ? 'timeout' : 'unavailable';
-      // A refusal that comes back instantly means the browser never even
-      // asked — the permission is already denied and pressing the button
-      // again will never help, so open the real instructions unprompted.
-      if (geoTried && err.code === 1 && Date.now() - asked < 1000) showHelp = true;
+
+      // A weak or missing high-accuracy fix is often satisfiable with a
+      // coarse one, which is plenty for "which pit am I standing at".
+      if ((err.code === 2 || err.code === 3) && !triedCoarse){
+        triedCoarse = true;
+        startGeo({ coarse:true });
+        return;
+      }
+      // An instant refusal means the browser never asked: the permission is
+      // already stored as denied, so pressing the button again cannot help.
+      if (geoTried && err.code === 1 && ms < 1000) showHelp = true;
       if (tab === 'walk') renderWalk();
     },
-    { enableHighAccuracy:true, maximumAge:5000, timeout:20000 }
+    coarse
+      ? { enableHighAccuracy:false, maximumAge:60000, timeout:30000 }
+      : { enableHighAccuracy:true,  maximumAge:5000,  timeout:20000 }
   );
 }
 
@@ -656,9 +675,13 @@ async function primeGeo(){
   try{
     if (!navigator.permissions || !navigator.permissions.query) return;
     const st = await navigator.permissions.query({ name:'geolocation' });
+    permState = st.state;
     if (st.state === 'denied'){ geo = 'blocked'; renderWalk(); }
-    st.onchange = () => { if (st.state === 'granted') startGeo(); };
-  }catch(e){ /* Safari < 16 has no geolocation permission query */ }
+    st.onchange = () => {
+      permState = st.state;
+      if (st.state === 'granted') startGeo();
+    };
+  }catch(e){ permState = 'unsupported'; }  // Safari doesn't expose this one
 }
 
 function onOrient(e){
@@ -703,23 +726,38 @@ function initCompass(){
    no lock icon and no per-site menu in the usual place, so generic
    "click the padlock" advice sends people looking for something absent. */
 function geoHelp(){
-  if (IS_IOS) return `
-    <b>On iPhone, two places control this:</b>
+  const instant = lastGeoErr && lastGeoErr.code === 1 && lastGeoErr.ms < 1000;
+  const body = IS_IOS ? `
+    ${instant ? `<b>Safari has a saved "Don't Allow" for this site.</b>
+      It won't ask again until you clear it — asking on load can't override that.` : ''}
     <ol>
-      <li>Tap the <b>page icon</b> at the left of the address bar →
-          <b>Website Settings</b> → <b>Location</b> → <b>Allow</b>, then reload.</li>
-      <li>If that's already Allow, open <b>Settings → Privacy &amp; Security →
-          Location Services</b>, make sure it's on, then
-          <b>Safari Websites → While Using the App</b>.</li>
+      <li><b>Settings → Safari</b> → scroll to <b>Settings for Websites</b> →
+          <b>Location</b>. Find this site and set it to <b>Ask</b> or
+          <b>Allow</b>, then reload here.</li>
+      <li>If it isn't listed, tap the <b>page icon</b> left of the address bar →
+          <b>Website Settings</b> → <b>Location</b>.</li>
+      <li>Check <b>Settings → Privacy &amp; Security → Location Services</b> is on,
+          and <b>Safari Websites</b> is set to <b>While Using the App</b>.</li>
     </ol>
-    Private Browsing also blocks location on some iOS versions.`;
-  return `
-    <b>Unblock location for this site:</b>
+    Private Browsing blocks location on some iOS versions.` : `
+    ${instant ? `<b>This browser has a saved block for this site.</b>` : ''}
     <ol>
       <li>Tap the <b>lock</b> or <b>ⓘ</b> icon beside the address bar →
           <b>Location</b> → <b>Allow</b>, then reload.</li>
       <li>Check your device's own location setting is on for this browser.</li>
     </ol>`;
+  return body + `<p class="diag">${diagLine()}</p>`;
+}
+
+/* Exact state, so a problem on a phone we can't inspect stops being guesswork */
+function diagLine(){
+  const codes = { 1:'1 denied', 2:'2 unavailable', 3:'3 timeout' };
+  return [
+    'perm: ' + (permState || 'unknown'),
+    'err: ' + (lastGeoErr ? (codes[lastGeoErr.code] || lastGeoErr.code) + ' in ' + lastGeoErr.ms + 'ms' : 'none'),
+    'secure: ' + (window.isSecureContext ? 'yes' : 'NO'),
+    'coarse tried: ' + (triedCoarse ? 'yes' : 'no')
+  ].join(' · ');
 }
 
 /* rotate without spinning the long way round */
