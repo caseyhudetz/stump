@@ -104,24 +104,38 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-size:clamp(2.6rem,13vw,4rem);line-height:.9;
   color:var(--ok);margin:0;text-transform:uppercase;letter-spacing:-.01em;
 }
-.offbig{
-  font-variation-settings:'wdth' 62,'wght' 800;
-  font-size:clamp(2rem,10vw,3rem);line-height:.95;
-  margin:0;text-transform:uppercase;letter-spacing:-.01em;
+/* location trouble is a banner, not the headline — the address and the two
+   buttons still have to be the thing you can act on */
+.banner{
+  display:flex;align-items:center;justify-content:center;gap:.6rem;
+  flex-wrap:wrap;width:100%;
+  border:1px solid var(--line);background:var(--wash);
+  padding:.6rem .75rem;margin-bottom:1.4rem;
 }
-.bigbtn{
-  margin-top:1.15rem;padding:.95rem 1.5rem;
+.banner.bad{border-color:var(--hot);background:#FDF0EC}
+.bmsg{
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--ink);
+}
+.banner.bad .bmsg{color:var(--hot)}
+.bbtn{
   font-family:'Archivo',sans-serif;
-  font-variation-settings:'wdth' 78,'wght' 700;
-  font-size:.98rem;text-transform:uppercase;letter-spacing:.04em;
-  background:var(--ink);color:var(--paper);border:2px solid var(--ink);
-  cursor:pointer;border-radius:0;min-height:3.2rem;
+  font-variation-settings:'wdth' 84,'wght' 700;
+  font-size:.76rem;text-transform:uppercase;letter-spacing:.04em;
+  background:var(--ink);color:var(--paper);border:1px solid var(--ink);
+  padding:.42rem .7rem;cursor:pointer;border-radius:0;min-height:2.1rem;
 }
-.bigbtn:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
+.bbtn:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.bhelp{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim)}
 .help{
-  font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);
-  line-height:1.7;margin:.9rem auto 0;max-width:23rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--ink);
+  line-height:1.75;margin:0 auto 1.4rem;max-width:24rem;text-align:left;
+  border-left:2px solid var(--hot);padding:.2rem 0 .2rem .8rem;
 }
+.help ol{margin:.5rem 0 0;padding-left:1.1rem}
+.help li{margin-bottom:.5rem}
+/* with no distance to show, the address carries the screen */
+#walk.nofix .addr{font-size:clamp(1.8rem,9vw,2.5rem);margin-top:0}
 .pickedtag{
   font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
   text-transform:uppercase;letter-spacing:.09em;margin:1.4rem 0 -.9rem;
@@ -395,7 +409,7 @@ async function pushMarks(){
       body: JSON.stringify({ marks }),
       cache:'no-store'
     });
-    if (r.status === 503){ sync = 'off'; paintSync(); return; }
+    if (r.status === 503 || r.status === 404){ sync = 'off'; paintSync(); return; }
     if (!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
     marks = mergeMarks(marks, j.marks || {});
@@ -411,7 +425,7 @@ async function pullMarks({ quiet = false } = {}){
   if (sync === 'off') return false;
   try{
     const r = await fetch(SYNC_URL, { cache:'no-store' });
-    if (r.status === 503){ sync = 'off'; paintSync(); return false; }
+    if (r.status === 503 || r.status === 404){ sync = 'off'; paintSync(); return false; }
     if (!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
     const before = JSON.stringify(marks);
@@ -582,6 +596,11 @@ let compass = 'idle';    // idle | ask | on | denied | unsupported
 let override = false;    // user chose to mark from a distance
 let picked = null;       // site id chosen from the map, overrides "nearest"
 let map = null, layer = null;
+let showHelp = false;    // location recovery steps expanded
+let geoTried = false;    // user has pressed "turn on location" at least once
+
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 const stateOf = s => (marks[s.id] && marks[s.id].state) || 'open';
 const from = () => me || HOME;
@@ -608,6 +627,7 @@ const isPicked = () => { const t = target(); return !!(picked && t && t.id === p
 function startGeo(){
   if (!navigator.geolocation){ geo = 'unsupported'; renderWalk(); return; }
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  const asked = Date.now();
   geo = 'locating'; renderWalk();
   watchId = navigator.geolocation.watchPosition(
     pos => {
@@ -621,6 +641,10 @@ function startGeo(){
       me = null;
       // 1 PERMISSION_DENIED · 2 POSITION_UNAVAILABLE · 3 TIMEOUT
       geo = err.code === 1 ? 'blocked' : err.code === 3 ? 'timeout' : 'unavailable';
+      // A refusal that comes back instantly means the browser never even
+      // asked — the permission is already denied and pressing the button
+      // again will never help, so open the real instructions unprompted.
+      if (geoTried && err.code === 1 && Date.now() - asked < 1000) showHelp = true;
       if (tab === 'walk') renderWalk();
     },
     { enableHighAccuracy:true, maximumAge:5000, timeout:20000 }
@@ -675,6 +699,29 @@ function initCompass(){
   else attachOrient();
 }
 
+/* Recovery steps, written for the browser actually in hand. iOS Safari has
+   no lock icon and no per-site menu in the usual place, so generic
+   "click the padlock" advice sends people looking for something absent. */
+function geoHelp(){
+  if (IS_IOS) return `
+    <b>On iPhone, two places control this:</b>
+    <ol>
+      <li>Tap the <b>page icon</b> at the left of the address bar →
+          <b>Website Settings</b> → <b>Location</b> → <b>Allow</b>, then reload.</li>
+      <li>If that's already Allow, open <b>Settings → Privacy &amp; Security →
+          Location Services</b>, make sure it's on, then
+          <b>Safari Websites → While Using the App</b>.</li>
+    </ol>
+    Private Browsing also blocks location on some iOS versions.`;
+  return `
+    <b>Unblock location for this site:</b>
+    <ol>
+      <li>Tap the <b>lock</b> or <b>ⓘ</b> icon beside the address bar →
+          <b>Location</b> → <b>Allow</b>, then reload.</li>
+      <li>Check your device's own location setting is on for this browser.</li>
+    </ol>`;
+}
+
 /* rotate without spinning the long way round */
 let arrowAngle = 0;
 function paintArrow(){
@@ -725,26 +772,26 @@ function renderWalk(){
   const arrived = known && ft <= ARRIVE_FT;
   const canMark = arrived || override || !known;
 
-  // distance readout
+  // distance readout — when there's no fix the address is the hero instead,
+  // so the screen stays usable for marking by eye
   let readout;
   if (!known){
-    const headline = {
-      locating:   ['Finding you…',   'hold tight'],
-      blocked:    ['Location off',   'blocked in this browser'],
-      timeout:    ['No fix yet',     'signal is weak'],
-      unavailable:['No fix yet',     'location unavailable'],
-      unsupported:['No location',    'not supported here'],
-      idle:       ['Location off',   'not turned on']
-    }[geo] || ['Location off','not turned on'];
+    const label = {
+      locating:   'Finding you…',
+      blocked:    'Location blocked',
+      timeout:    'No GPS fix — signal is weak',
+      unavailable:'Location unavailable',
+      unsupported:'No location in this browser',
+      idle:       'Location off'
+    }[geo] || 'Location off';
+    const canRetry = geo !== 'locating' && geo !== 'unsupported';
     readout = `
-      <p class="offbig">${geo === 'locating' ? '<span class="spin">◍</span> ' : ''}${headline[0]}</p>
-      <p class="distunit">${headline[1]}</p>
-      ${geo !== 'locating' && geo !== 'unsupported'
-        ? `<button class="bigbtn" id="enable-geo">Turn on location</button>` : ''}
-      ${geo === 'blocked'
-        ? `<p class="help">Your browser is refusing it. Tap the <b>lock</b> or <b>ⓘ</b> icon
-             next to the address bar → Location → Allow, then reload.
-             On iOS also check Settings → Privacy → Location Services → Safari.</p>` : ''}`;
+      <div class="banner${geo === 'locating' ? '' : ' bad'}">
+        <span class="bmsg">${geo === 'locating' ? '<span class="spin">◍</span> ' : '⚠ '}${label}</span>
+        ${canRetry ? `<button class="bbtn" id="enable-geo">Turn on</button>` : ''}
+        ${canRetry ? `<button class="linkish bhelp" id="toggle-help">${showHelp ? 'hide' : 'how'}</button>` : ''}
+      </div>
+      ${showHelp && canRetry ? `<div class="help">${geoHelp()}</div>` : ''}`;
   } else if (arrived){
     readout = `<p class="arrivedbig">You're here</p>
       <p class="distunit">within ${Math.round(ft)} ft</p>`;
@@ -775,6 +822,7 @@ function renderWalk(){
   if (known && accuracy && accuracy > 40 && !arrived)
     hint += `<br><span class="warn">GPS is fuzzy (±${Math.round(accuracy*3.28)} ft)</span>`;
 
+  el.classList.toggle('nofix', !known);
   el.innerHTML = `
     ${dial}
     ${readout}
@@ -946,7 +994,8 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#unskip')){ skipped.clear(); renderWalk(); return; }
   if (e.target.closest('#unpick')){ picked = null; renderWalk(); return; }
   if (e.target.closest('#override')){ override = true; renderWalk(); return; }
-  if (e.target.closest('#enable-geo')){ startGeo(); return; }
+  if (e.target.closest('#enable-geo')){ geoTried = true; startGeo(); return; }
+  if (e.target.closest('#toggle-help')){ showHelp = !showHelp; renderWalk(); return; }
   if (e.target.closest('#ask-compass')){ startCompass(); return; }
   if (e.target.closest('#moresaved')){ shownSaved += PAGE; renderSaved(); return; }
 
