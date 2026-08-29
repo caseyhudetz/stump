@@ -1,7 +1,22 @@
 {
   "name": "stump",
   "compatibility_date": "2026-08-29",
+  "main": "src/worker.js",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS"
   }
+
+  // Cross-device sync needs a KV namespace. Create it once:
+  //
+  //     npx wrangler kv namespace create MARKS
+  //
+  // then paste the returned id below and redeploy:
+  //
+  // "kv_namespaces": [
+  //   { "binding": "MARKS", "id": "<paste the id here>" }
+  // ]
+  //
+  // Until that binding exists, /api/marks answers 503 and the app
+  // keeps marks on the device only — the site still works.
 }
