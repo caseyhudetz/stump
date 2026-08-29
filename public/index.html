@@ -3,241 +3,224 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stump — 44th Ward parkway gaps</title>
-<meta name="theme-color" content="#E6E6E1">
+<title>Stump — parkway tree check</title>
+<meta name="theme-color" content="#FFFFFF">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Stump">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23E6E6E1'/%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23DE4B12' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23DE4B12' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='1.75' fill='%23DE4B12'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230B0B0C'/%3E%3Cpath d='M16 5 L27 29 L16 23 L5 29 Z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
-  --concrete:#E6E6E1;
-  --card:#F3F3EF;
-  --bark:#23201C;
-  --stone:#75726A;
-  --rule:#CFCEC7;
-  --paint:#DE4B12;
-  --leaf:#2F6B45;
-  --sky:#1E5A78;
-  --pit:#D8D7D0;
+  --paper:#FFFFFF;
+  --ink:#0B0B0C;
+  --dim:#6E6E75;
+  --line:#DCDCE0;
+  --wash:#F4F4F6;
+  --hot:#E2330A;
+  --ok:#0B7A38;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
 [hidden]{display:none!important}
+html,body{margin:0;padding:0;height:100%}
 body{
-  background:var(--concrete);
-  color:var(--bark);
+  background:var(--paper);
+  color:var(--ink);
   font-family:'Archivo',system-ui,sans-serif;
-  font-variation-settings:'wdth' 100;
-  font-size:16px;
-  line-height:1.45;
-  padding-bottom:4rem;
+  font-size:16px;line-height:1.4;
   -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:contain;
 }
-.wrap{max-width:640px;margin:0 auto;padding:0 1rem}
+.mono{font-family:'IBM Plex Mono',monospace}
 
-/* ---------- masthead ---------- */
-header{
-  position:sticky;top:0;z-index:20;
-  background:var(--concrete);
-  border-bottom:1px solid var(--rule);
-  padding-top:calc(env(safe-area-inset-top) + .65rem);
+/* ---------- shell ---------- */
+.app{
+  min-height:100dvh;display:flex;flex-direction:column;
+  max-width:560px;margin:0 auto;
 }
-.mast{display:flex;align-items:baseline;gap:.6rem;padding:0 0 .55rem}
-.logo{
-  font-variation-settings:'wdth' 68,'wght' 800;
-  font-size:1.85rem;letter-spacing:.06em;text-transform:uppercase;
+.topbar{
+  padding:calc(env(safe-area-inset-top) + .9rem) 1.1rem .7rem;
+  border-bottom:1px solid var(--line);
+}
+.brandrow{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.mark{
+  font-variation-settings:'wdth' 62,'wght' 800;
+  font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase;
   line-height:1;margin:0;
 }
-.tagline{
+.left{
   font-family:'IBM Plex Mono',monospace;font-size:.68rem;
-  color:var(--stone);letter-spacing:.02em;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--dim);
 }
-.counts{
-  display:flex;gap:0;border-top:1px solid var(--rule);
+.tabs{display:flex;gap:.35rem;margin-top:.75rem}
+.tab{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
+  text-transform:uppercase;letter-spacing:.09em;
+  padding:.42rem .7rem;border:1px solid var(--line);
+  background:transparent;color:var(--dim);cursor:pointer;border-radius:0;
+}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tab:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+
+main{flex:1;display:flex;flex-direction:column;min-height:0}
+
+/* ---------- walk screen ---------- */
+#walk{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:1rem 1.1rem 0;gap:.15rem;
+}
+.dial{
+  width:104px;height:104px;display:flex;align-items:center;justify-content:center;
+  color:var(--ink);margin-bottom:.5rem;
+}
+.dial svg{width:100%;height:100%;display:block}
+#arrowRot{transition:transform .25s cubic-bezier(.2,.7,.3,1);transform-origin:50% 50%}
+.dial.arrived{color:var(--ok)}
+
+.distnum{
+  font-variation-settings:'wdth' 62,'wght' 800;
+  font-feature-settings:'tnum' 1;
+  font-size:clamp(4.6rem,26vw,7.5rem);
+  line-height:.82;letter-spacing:-.025em;
+  margin:0;
+}
+.distunit{
   font-family:'IBM Plex Mono',monospace;
+  font-size:.74rem;text-transform:uppercase;letter-spacing:.18em;
+  color:var(--dim);margin:.55rem 0 0;
 }
-.count{flex:1;padding:.5rem 0 .6rem;border-right:1px solid var(--rule)}
-.count:last-child{border-right:0}
-.count b{display:block;font-size:1.3rem;font-weight:600;line-height:1.1}
-.count span{font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--stone)}
-.count.act b{color:var(--paint)}
-.count.done b{color:var(--leaf)}
-.count[data-jump]{cursor:pointer}
-
-/* ---------- controls ---------- */
-.bar{display:flex;gap:.4rem;padding:.7rem 0;flex-wrap:wrap;align-items:center}
-.chip{
-  font-family:'IBM Plex Mono',monospace;font-size:.7rem;
-  text-transform:uppercase;letter-spacing:.07em;
-  padding:.4rem .65rem;border:1px solid var(--rule);
-  background:transparent;color:var(--stone);
-  border-radius:2px;cursor:pointer;
+.arrivedbig{
+  font-variation-settings:'wdth' 62,'wght' 800;
+  font-size:clamp(2.6rem,13vw,4rem);line-height:.9;
+  color:var(--ok);margin:0;text-transform:uppercase;letter-spacing:-.01em;
 }
-.chip[aria-pressed="true"]{background:var(--bark);color:var(--concrete);border-color:var(--bark)}
-.chip:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
-
-/* ---------- queue (walking) view ---------- */
-.locline{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
-  padding:.7rem 0 0;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
-}
-.locline button{
-  font:inherit;color:var(--sky);background:none;border:none;cursor:pointer;
-  text-decoration:underline;padding:0;text-transform:uppercase;letter-spacing:.06em;
-}
-.focus{margin-top:.7rem;padding:1.3rem 1.1rem 1.2rem}
-.focus .addr{font-size:1.7rem}
-.walklink{
-  display:inline-block;margin-top:.65rem;font-family:'IBM Plex Mono',monospace;
-  font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--sky);
-  text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px;
-}
-.upnext{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
-  text-align:center;padding:.8rem 0;
-}
-
-/* ---------- sticky bottom dock ---------- */
-.dock{
-  position:fixed;left:0;right:0;bottom:0;z-index:30;
-  max-width:640px;margin:0 auto;
-  display:flex;gap:.5rem;align-items:stretch;
-  padding:.6rem 1rem calc(.6rem + env(safe-area-inset-bottom));
-  background:var(--concrete);border-top:1px solid var(--rule);
-  box-shadow:0 -4px 12px rgba(0,0,0,.05);
-}
-.dock .btn{min-height:3.1rem;font-size:.92rem}
-.dock .dockskip{flex:0 0 auto;padding:0 .8rem;border-color:transparent;color:var(--stone)}
-body.has-dock{padding-bottom:6.5rem}
-
-/* ---------- site card ---------- */
-.card{
-  background:var(--card);
-  border:1px solid var(--rule);
-  border-left:3px solid var(--rule);
-  margin-bottom:.7rem;
-  padding:.85rem .9rem .9rem;
-}
-.card.s-none{border-left-color:var(--paint)}
-.card.s-tree{border-left-color:var(--stone);opacity:.6}
-.card.s-req{border-left-color:var(--leaf)}
-.chead{display:flex;gap:.75rem;align-items:flex-start}
-.glyph{flex:0 0 auto;margin-top:.15rem}
-.cmain{flex:1;min-width:0}
 .addr{
-  font-variation-settings:'wdth' 72,'wght' 700;
-  font-size:1.32rem;line-height:1.1;letter-spacing:.005em;
-  text-transform:uppercase;margin:0 0 .3rem;
-  overflow-wrap:break-word;
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:1.5rem;line-height:1.08;text-transform:uppercase;
+  margin:1.5rem 0 0;overflow-wrap:break-word;
 }
-.meta{
+.sub{
   font-family:'IBM Plex Mono',monospace;font-size:.7rem;
-  color:var(--stone);line-height:1.6;
+  color:var(--dim);margin:.5rem 0 0;line-height:1.6;
 }
-.meta .dot{opacity:.45;padding:0 .35rem}
-.meta .far{color:var(--bark);font-weight:500}
+.hint{
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  color:var(--dim);margin:1.15rem 0 .3rem;line-height:1.6;
+  min-height:1.2rem;
+}
+.hint b{color:var(--ok);font-weight:600}
+.hint .warn{color:var(--hot)}
+.linkish{
+  font:inherit;color:var(--ink);background:none;border:none;padding:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:3px;
+}
+.walkto{
+  display:inline-block;margin-top:.9rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);text-decoration:none;
+  border-bottom:1px solid var(--line);padding-bottom:2px;
+}
 
-/* ---------- buttons ---------- */
-.acts{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
-button.btn,a.btn{
+/* ---------- action dock ---------- */
+.dock{
+  display:flex;gap:.6rem;padding:.75rem 1.1rem calc(.75rem + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--paper);
+}
+.act{
+  flex:1;min-height:4.2rem;
   font-family:'Archivo',sans-serif;
-  font-variation-settings:'wdth' 88,'wght' 600;
-  font-size:.85rem;letter-spacing:.01em;
-  padding:.7rem .85rem;border-radius:2px;
-  border:1px solid var(--bark);background:transparent;color:var(--bark);
-  cursor:pointer;text-decoration:none;
-  display:inline-flex;align-items:center;justify-content:center;
-  flex:1;text-align:center;min-width:fit-content;min-height:2.75rem;
+  font-variation-settings:'wdth' 74,'wght' 700;
+  font-size:1.02rem;line-height:1.1;text-transform:uppercase;letter-spacing:.02em;
+  border:2px solid var(--ink);background:var(--paper);color:var(--ink);
+  cursor:pointer;border-radius:0;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  transition:opacity .18s ease,min-height .18s ease;
 }
-.btn:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
-.btn.solid{background:var(--bark);color:var(--concrete)}
-.btn.act{background:var(--paint);border-color:var(--paint);color:#fff}
-.btn.quiet{border-color:var(--rule);color:var(--stone);flex:0 0 auto}
-.btn.link{border-color:var(--rule);color:var(--sky)}
-/* mobile-first: stack action buttons full-width so they're easy to hit one-handed */
-@media (max-width:430px){
-  .acts{flex-direction:column}
-  .acts .btn{flex:1 1 auto;width:100%}
-}
+.act.no{background:var(--hot);border-color:var(--hot);color:#fff}
+.act:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.act:disabled{opacity:.28;cursor:default;min-height:3.2rem}
+.dock.far .act{min-height:3.2rem}
 
-/* ---------- packet ---------- */
-.packet{
-  margin-top:.8rem;border-top:1px solid var(--rule);padding-top:.8rem;
+/* ---------- generic screens ---------- */
+.scroller{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 2.5rem}
+#map{height:62vh;min-height:300px;width:100%;border:1px solid var(--line);background:var(--wash)}
+.legend{
+  display:flex;gap:1rem;flex-wrap:wrap;padding:.7rem 0 0;
+  font-family:'IBM Plex Mono',monospace;font-size:.63rem;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
 }
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.legend i{width:.62rem;height:.62rem;border-radius:50%;display:inline-block}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
+.leaflet-popup-content{font-family:'Archivo',sans-serif;margin:.7rem .8rem;min-width:150px}
+.leaflet-popup-content b{
+  display:block;font-variation-settings:'wdth' 78,'wght' 700;
+  text-transform:uppercase;font-size:.98rem;margin-bottom:.15rem;
+}
+.leaflet-popup-content .pm{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim)}
+
+/* ---------- saved ---------- */
+.card{border:1px solid var(--line);border-left:4px solid var(--line);padding:.9rem .95rem;margin-bottom:.8rem}
+.card.k-none{border-left-color:var(--hot)}
+.card.k-req{border-left-color:var(--ok)}
+.card.k-tree{border-left-color:var(--line);color:var(--dim)}
+.card h3{
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:1.16rem;line-height:1.1;text-transform:uppercase;margin:0 0 .35rem;
+}
+.card .cm{font-family:'IBM Plex Mono',monospace;font-size:.67rem;color:var(--dim);line-height:1.6}
+.row{display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap}
+.mini{
+  flex:1;min-height:2.9rem;min-width:8rem;
+  font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 84,'wght' 650;
+  font-size:.83rem;border:1px solid var(--ink);background:transparent;color:var(--ink);
+  cursor:pointer;text-decoration:none;border-radius:0;
+  display:inline-flex;align-items:center;justify-content:center;text-align:center;padding:.5rem .6rem;
+}
+.mini.fill{background:var(--ink);color:var(--paper)}
+.mini.hot{background:var(--hot);border-color:var(--hot);color:#fff}
+.mini.ghost{border-color:var(--line);color:var(--dim)}
+.packet{margin-top:.9rem;border-top:1px solid var(--line);padding-top:.8rem}
 .packet h4{
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--paint);
-  margin:0 0 .6rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.12em;color:var(--hot);margin:0 0 .55rem;
 }
-.field{border-bottom:1px dotted var(--rule);padding:.5rem 0}
+.field{border-bottom:1px dotted var(--line);padding:.5rem 0}
 .field:last-of-type{border-bottom:0}
 .flabel{
-  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
-  text-transform:uppercase;letter-spacing:.08em;color:var(--stone);
-  display:block;margin-bottom:.2rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.58rem;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+  display:block;margin-bottom:.22rem;
 }
 .fval{display:flex;gap:.5rem;align-items:flex-start}
-.fval p{margin:0;flex:1;font-size:.9rem;line-height:1.4}
+.fval p{margin:0;flex:1;font-size:.88rem;line-height:1.42}
 .copy{
-  font-family:'IBM Plex Mono',monospace;font-size:.58rem;
-  text-transform:uppercase;letter-spacing:.06em;
-  border:1px solid var(--rule);background:transparent;color:var(--stone);
-  padding:.28rem .45rem;border-radius:2px;cursor:pointer;flex:0 0 auto;
+  font-family:'IBM Plex Mono',monospace;font-size:.56rem;
+  text-transform:uppercase;letter-spacing:.07em;
+  border:1px solid var(--line);background:transparent;color:var(--dim);
+  padding:.3rem .45rem;cursor:pointer;flex:0 0 auto;
 }
-.copy.ok{background:var(--leaf);border-color:var(--leaf);color:#fff}
-
-/* ---------- map ---------- */
-#mapview{margin:.7rem 0}
-#map{
-  height:65vh;min-height:320px;width:100%;
-  border:1px solid var(--rule);background:var(--card);
-}
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{
-  background:var(--card);color:var(--bark);border-radius:2px;
-}
-.leaflet-popup-content{
-  font-family:'Archivo',sans-serif;font-size:.85rem;line-height:1.4;
-  margin:.7rem .8rem;min-width:170px;
-}
-.leaflet-popup-content b{
-  display:block;font-variation-settings:'wdth' 72,'wght' 700;
-  text-transform:uppercase;font-size:1rem;margin-bottom:.2rem;
-}
-.leaflet-popup-content .pmeta{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
-}
-.popact{display:flex;gap:.35rem;margin-top:.55rem;flex-wrap:wrap}
-.popact .btn{padding:.4rem .55rem;font-size:.72rem;min-height:auto;flex:0 0 auto;width:auto}
-.maplegend{
-  display:flex;gap:.9rem;flex-wrap:wrap;padding:.55rem 0 0;
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
-  text-transform:uppercase;letter-spacing:.06em;color:var(--stone);
-}
-.maplegend span{display:inline-flex;align-items:center;gap:.3rem}
-.maplegend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
+.copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
 
 /* ---------- states ---------- */
 .msg{
-  font-family:'IBM Plex Mono',monospace;font-size:.78rem;
-  color:var(--stone);padding:2.5rem 0;text-align:center;line-height:1.7;
+  font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--dim);
+  text-align:center;line-height:1.75;padding:2.5rem 1rem;
 }
-.msg b{display:block;font-size:1rem;color:var(--bark);margin-bottom:.4rem}
-.err{color:var(--paint)}
-.more{width:100%;margin:.4rem 0 1rem}
-footer{
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
-  color:var(--stone);line-height:1.7;
-  border-top:1px solid var(--rule);margin-top:1.5rem;padding-top:1rem;
-}
-footer a{color:var(--sky)}
-.spin{display:inline-block;animation:sp 1.4s linear infinite}
+.msg b{display:block;font-family:'Archivo',sans-serif;font-size:1.15rem;color:var(--ink);margin-bottom:.5rem;
+  font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase}
+.msg.bad b{color:var(--hot)}
+.spin{display:inline-block;animation:sp 1.3s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.glyph circle,.glyph rect,.glyph path{transition:all .25s ease}
+.note{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
+  line-height:1.75;border-top:1px solid var(--line);margin-top:1.5rem;padding-top:1rem;
+}
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
@@ -245,62 +228,53 @@ footer a{color:var(--sky)}
 </head>
 <body>
 
-<header>
-  <div class="wrap">
-    <div class="mast">
-      <h1 class="logo">Stump</h1>
-      <span class="tagline">44th Ward · parkway gaps</span>
+<div class="app">
+  <div class="topbar">
+    <div class="brandrow">
+      <h1 class="mark">Stump</h1>
+      <span class="left" id="leftcount">—</span>
     </div>
-  </div>
-  <div class="wrap">
-    <div class="counts">
-      <div class="count"><b id="c-open">—</b><span>To check</span></div>
-      <div class="count act" id="jump-none" data-jump="none"><b id="c-none">—</b><span>No tree</span></div>
-      <div class="count done" id="jump-req" data-jump="req"><b id="c-req">—</b><span>Requested</span></div>
-    </div>
-  </div>
-</header>
-
-<main class="wrap">
-  <div class="bar" id="bar" hidden>
-    <button class="chip" data-mode="queue" aria-pressed="true">Queue</button>
-    <button class="chip" data-mode="map" aria-pressed="false">Map</button>
-    <button class="chip" data-mode="reviewed" aria-pressed="false">Reviewed</button>
-  </div>
-
-  <div id="queueview" hidden>
-    <p class="locline" id="locline"></p>
-    <div id="focus"></div>
-  </div>
-
-  <div id="mapview" hidden>
-    <div id="map"></div>
-    <div class="maplegend">
-      <span><i style="background:#75726A"></i>To check</span>
-      <span><i style="background:#1E5A78"></i>Home</span>
+    <div class="tabs" id="tabs" hidden>
+      <button class="tab" data-tab="walk" aria-pressed="true">Walk</button>
+      <button class="tab" data-tab="map" aria-pressed="false">Map</button>
+      <button class="tab" data-tab="saved" aria-pressed="false">Saved</button>
     </div>
   </div>
 
-  <div id="reviewedview" hidden>
-    <div class="bar" id="reviewedTabs">
-      <button class="chip" data-rtab="none" aria-pressed="true">No tree</button>
-      <button class="chip" data-rtab="req" aria-pressed="false">Requested</button>
-      <button class="chip" data-rtab="tree" aria-pressed="false">Has tree</button>
-    </div>
-    <div id="rlist"></div>
-    <button class="btn quiet more" id="moreR" hidden>Show 5 more</button>
+  <main>
+    <section id="walk"></section>
+
+    <section id="mapscreen" class="scroller" hidden>
+      <div id="map"></div>
+      <div class="legend">
+        <span><i style="background:#0B0B0C"></i>To check</span>
+        <span><i style="background:#E2330A"></i>Next up</span>
+        <span><i style="background:#0E6FD8"></i>You</span>
+      </div>
+    </section>
+
+    <section id="savedscreen" class="scroller" hidden>
+      <div class="tabs" id="savedtabs">
+        <button class="tab" data-stab="none" aria-pressed="true">To file</button>
+        <button class="tab" data-stab="req" aria-pressed="false">Filed</button>
+        <button class="tab" data-stab="tree" aria-pressed="false">Has tree</button>
+      </div>
+      <div id="savedlist" style="margin-top:1rem"></div>
+      <p class="note">
+        Data: Chicago 311 service requests, queried live from the city open data portal.
+        A site appears when a Tree Removal Inspection closed as Completed in the last six
+        months and no Tree Planting Request has been filed at that address since.<br>
+        Your marks are stored on this device only.<br>
+        <span id="stamp"></span>
+      </p>
+    </section>
+  </main>
+
+  <div class="dock" id="dock" hidden>
+    <button class="act yes" id="btn-tree">Tree<br>is here</button>
+    <button class="act no" id="btn-none">No<br>tree</button>
   </div>
-
-  <footer>
-    Data: Chicago 311 service requests, queried live from the city open data portal.<br>
-    A site appears here when a Tree Removal Inspection closed as Completed in the
-    last six months and no Tree Planting Request has been filed at that address since.<br>
-    Your check marks are stored on this device only.<br>
-    <span id="stamp"></span>
-  </footer>
-</main>
-
-<div class="dock" id="dock" hidden></div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -310,8 +284,9 @@ footer a{color:var(--sky)}
 const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
-const LOOKBACK_MONTHS = 6;   // how far back to look for closed removals. change this one number.
-const PAGE = 5;
+const LOOKBACK_MONTHS = 6;
+const ARRIVE_FT = 60;          // within this many feet counts as "you're here"
+const PAGE = 8;
 
 const REMOVALS_SINCE = (() => {
   const d = new Date();
@@ -320,7 +295,7 @@ const REMOVALS_SINCE = (() => {
 })();
 
 /* ============================================================
-   STORAGE  (works in Claude preview and on a real host)
+   STORAGE
    ============================================================ */
 const Store = {
   async get(k){
@@ -333,15 +308,17 @@ const Store = {
     try{
       if (window.storage) { await window.storage.set(k,v); return; }
       localStorage.setItem(k,v);
-    }catch(e){ /* memory-only fallback */ }
+    }catch(e){}
   }
 };
-let marks = {};   //  sr_number -> { state:'none'|'tree'|'req', at:ISO }
+let marks = {};   // sr_number -> { state:'none'|'tree'|'req', at:ISO }
 
 /* ============================================================
    HELPERS
    ============================================================ */
 const $ = s => document.querySelector(s);
+const rad = x => x * Math.PI / 180;
+const deg = x => x * 180 / Math.PI;
 
 function normAddr(r){
   const n = (r.street_number||'').replace(/^0+/,'');
@@ -358,11 +335,22 @@ function titleCase(str){
   }).join(' ');
 }
 
+/* great-circle distance in miles */
 function miles(a,b){
-  const R=3958.8, tr=x=>x*Math.PI/180;
-  const dLat=tr(b.lat-a.lat), dLng=tr(b.lng-a.lng);
-  const h=Math.sin(dLat/2)**2 + Math.cos(tr(a.lat))*Math.cos(tr(b.lat))*Math.sin(dLng/2)**2;
+  const R = 3958.8;
+  const dLat = rad(b.lat-a.lat), dLng = rad(b.lng-a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(h));
+}
+const feet = (a,b) => miles(a,b) * 5280;
+
+/* initial bearing from a to b, degrees clockwise from true north */
+function bearing(a,b){
+  const dLng = rad(b.lng - a.lng);
+  const y = Math.sin(dLng) * Math.cos(rad(b.lat));
+  const x = Math.cos(rad(a.lat))*Math.sin(rad(b.lat))
+          - Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(dLng);
+  return (deg(Math.atan2(y,x)) + 360) % 360;
 }
 
 function ago(iso){
@@ -374,30 +362,8 @@ function ago(iso){
   if (mo < 24) return mo+' months ago';
   return Math.floor(days/365)+'+ years ago';
 }
-
 function longDate(iso){
   return new Date(iso).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-}
-
-/* pit glyph — a sidewalk cut, empty or planted */
-function glyph(state){
-  const c = {open:'var(--stone)', none:'var(--paint)', tree:'var(--stone)', req:'var(--leaf)'}[state];
-  let inner = '';
-  if (state === 'open')
-    inner = `<circle cx="17" cy="17" r="5.5" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="2.5 3"/>`;
-  if (state === 'none')
-    inner = `<path d="M12 12 L22 22 M22 12 L12 22" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>`;
-  if (state === 'tree')
-    inner = `<circle cx="17" cy="17" r="6.5" fill="none" stroke="${c}" stroke-width="1.5"/>
-             <circle cx="17" cy="17" r="3" fill="none" stroke="${c}" stroke-width="1.5"/>
-             <circle cx="17" cy="17" r="1" fill="${c}"/>`;
-  if (state === 'req')
-    inner = `<path d="M17 23 L17 13" stroke="${c}" stroke-width="2" stroke-linecap="round"/>
-             <path d="M17 16 C17 13 14.5 11.5 12.5 11.5 C12.5 14 14.5 16 17 16 Z" fill="${c}"/>
-             <path d="M17 18 C17 15.5 19.2 14 21 14 C21 16.2 19.2 18 17 18 Z" fill="${c}" opacity=".65"/>`;
-  return `<svg class="glyph" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-    <rect x="2" y="2" width="30" height="30" fill="var(--pit)" stroke="var(--rule)" stroke-width="1"/>
-    ${inner}</svg>`;
 }
 
 /* ============================================================
@@ -418,7 +384,7 @@ async function loadSites(){
     soda(
       `ward=${WARD} AND sr_type='Tree Removal Inspection' AND status='Completed' `+
       `AND closed_date > '${REMOVALS_SINCE}T00:00:00' AND latitude IS NOT NULL`,
-      'sr_number,street_number,street_direction,street_name,street_type,street_address,zip_code,latitude,longitude,closed_date,created_date'
+      'sr_number,street_number,street_direction,street_name,street_type,zip_code,latitude,longitude,closed_date,created_date'
     ),
     soda(
       `ward=${WARD} AND sr_type='Tree Planting Request' AND created_date > '2023-01-01T00:00:00'`,
@@ -426,14 +392,12 @@ async function loadSites(){
     )
   ]);
 
-  // index planting requests by normalized address
   const plant = {};
   for (const p of plantings){
     const k = normAddr(p); if (!k) continue;
     (plant[k] = plant[k] || []).push(p);
   }
 
-  // one entry per address, keeping the most recent completed removal
   const byAddr = {};
   for (const r of removals){
     const k = normAddr(r); if (!k || !r.closed_date) continue;
@@ -444,31 +408,23 @@ async function loadSites(){
   for (const k in byAddr){
     const r = byAddr[k];
     const reqs = plant[k] || [];
-    // covered if a planting request came in after the removal closed,
-    // or if any planting request at this address is still open
     const covered = reqs.some(p => p.created_date > r.closed_date || p.status === 'Open');
     if (covered) continue;
-
-    const street = titleCase(
-      [r.street_direction, r.street_name, r.street_type].filter(Boolean).join(' ')
-    );
+    const street = titleCase([r.street_direction, r.street_name, r.street_type].filter(Boolean).join(' '));
     sites.push({
       id: r.sr_number,
-      num: r.street_number,
-      street,
       address: r.street_number+' '+street,
       zip: r.zip_code || '60657',
       lat: +r.latitude,
       lng: +r.longitude,
-      closed: r.closed_date,
-      opened: r.created_date
+      closed: r.closed_date
     });
   }
   return sites;
 }
 
 /* ============================================================
-   THE 311 PACKET
+   311 PACKET
    ============================================================ */
 function packet(s){
   return {
@@ -483,327 +439,383 @@ function packet(s){
     'Has a tree been planted recently?': 'No'
   };
 }
-
 function packetText(s){
   const p = packet(s);
   return Object.keys(p).map(k => k+'\n'+p[k]).join('\n\n');
 }
 
 /* ============================================================
-   RENDER
+   STATE
    ============================================================ */
-let SITES = [], mode = 'queue', rtab = 'none', shownR = PAGE, skipped = new Set();
-let me = null, geoState = 'idle', geoWatchId = null;
-const STATE_COLOR = {open:'#75726A', none:'#DE4B12', tree:'#B8B6AE', req:'#2F6B45'};
-let map = null, markerLayer = null;
+let SITES = [];
+let tab = 'walk', stab = 'none', shownSaved = PAGE;
+let skipped = new Set();
+let me = null, accuracy = null;
+let geo = 'idle';        // idle | locating | on | denied | unsupported
+let heading = null;
+let compass = 'idle';    // idle | ask | on | denied | unsupported
+let override = false;    // user chose to mark from a distance
+let map = null, layer = null;
 
-function stateOf(s){ return (marks[s.id] && marks[s.id].state) || 'open'; }
-function origin(){ return me || HOME; }
+const stateOf = s => (marks[s.id] && marks[s.id].state) || 'open';
+const from = () => me || HOME;
 
-function toCheckList(){
+function queue(){
   return SITES.filter(s => stateOf(s) === 'open' && !skipped.has(s.id))
-    .sort((a,b) => miles(origin(),a) - miles(origin(),b));
+              .sort((a,b) => miles(from(),a) - miles(from(),b));
+}
+function target(){ return queue()[0] || null; }
+
+/* ============================================================
+   LOCATION + COMPASS
+   ============================================================ */
+function startGeo(){
+  if (!navigator.geolocation){ geo = 'unsupported'; renderWalk(); return; }
+  geo = 'locating'; renderWalk();
+  navigator.geolocation.watchPosition(
+    pos => {
+      me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      accuracy = pos.coords.accuracy;
+      geo = 'on';
+      if (tab === 'walk') renderWalk();
+      if (tab === 'map') renderMap();
+    },
+    () => { me = null; geo = 'denied'; if (tab === 'walk') renderWalk(); },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+  );
 }
 
-function updateCounts(){
-  $('#c-open').textContent = SITES.filter(s=>stateOf(s)==='open').length;
-  $('#c-none').textContent = SITES.filter(s=>stateOf(s)==='none').length;
-  $('#c-req').textContent  = SITES.filter(s=>stateOf(s)==='req').length;
+function onOrient(e){
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
+  else if (typeof e.alpha === 'number' && (e.absolute || e.type === 'deviceorientationabsolute'))
+    h = (360 - e.alpha) % 360;
+  if (h === null || isNaN(h)) return;
+  const first = compass !== 'on';
+  heading = h; compass = 'on';
+  // the arrow only exists once compass is 'on', so the first fix has to rebuild the screen
+  if (first && tab === 'walk') renderWalk();
+  else paintArrow();
 }
 
-/* ---------- queue (walking) view ---------- */
-function renderLocline(){
-  const el = $('#locline');
-  if (geoState === 'granted') el.innerHTML = `Sorted by <b>your live location</b>`;
-  else if (geoState === 'locating') el.innerHTML = `Finding you… sorted from ${HOME.label} for now`;
-  else if (geoState === 'denied') el.innerHTML = `Location off — sorted from ${HOME.label} <button id="retry-loc">Try again</button>`;
-  else if (geoState === 'unsupported') el.innerHTML = `Sorted from ${HOME.label}`;
-  else el.innerHTML = `Sorted from ${HOME.label} <button id="retry-loc">Use my location</button>`;
+function attachOrient(){
+  if ('ondeviceorientationabsolute' in window)
+    window.addEventListener('deviceorientationabsolute', onOrient);
+  else
+    window.addEventListener('deviceorientation', onOrient);
 }
 
-function renderQueue(){
-  renderLocline();
-  const list = toCheckList();
-  const el = $('#focus');
+function startCompass(){
+  if (typeof DeviceOrientationEvent === 'undefined'){ compass = 'unsupported'; renderWalk(); return; }
+  if (typeof DeviceOrientationEvent.requestPermission === 'function'){
+    DeviceOrientationEvent.requestPermission()
+      .then(r => { if (r === 'granted'){ attachOrient(); } else { compass = 'denied'; } renderWalk(); })
+      .catch(() => { compass = 'denied'; renderWalk(); });
+  } else {
+    attachOrient();
+  }
+}
 
-  if (!list.length){
-    el.innerHTML = `<p class="msg"><b>You're all caught up.</b>Nothing left to check right now.<br>New removals appear here as the city closes them.</p>`;
-    $('#dock').hidden = true;
-    document.body.classList.remove('has-dock');
-    return;
+function initCompass(){
+  if (typeof DeviceOrientationEvent === 'undefined'){ compass = 'unsupported'; return; }
+  // iOS needs a user gesture; everything else can listen straight away
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') compass = 'ask';
+  else attachOrient();
+}
+
+/* rotate without spinning the long way round */
+let arrowAngle = 0;
+function paintArrow(){
+  const rot = $('#arrowRot');
+  const t = target();
+  if (!rot || !t || !me || heading === null) return;
+  const want = (bearing(me, t) - heading + 360) % 360;
+  arrowAngle += ((want - arrowAngle) % 360 + 540) % 360 - 180;
+  rot.style.transform = `rotate(${arrowAngle}deg)`;
+}
+
+/* ============================================================
+   WALK SCREEN
+   ============================================================ */
+const ARROW_SVG = `
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <g id="arrowRot"><path d="M50 6 L88 90 L50 68 L12 90 Z" fill="currentColor"/></g>
+  </svg>`;
+const HERE_SVG = `
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" stroke-width="7"/>
+    <path d="M32 51 L45 64 L70 38" fill="none" stroke="currentColor" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+function renderWalk(){
+  const el = $('#walk');
+  const dock = $('#dock');
+  const t = target();
+
+  $('#leftcount').textContent = SITES.length
+    ? SITES.filter(s => stateOf(s) === 'open').length + ' left'
+    : '—';
+
+  if (!SITES.length){
+    el.innerHTML = `<p class="msg"><span class="spin">◍</span><br>Reading Chicago 311…</p>`;
+    dock.hidden = true; return;
+  }
+  if (!t){
+    el.innerHTML = `<p class="msg"><b>All checked</b>
+      Nothing left to walk to.<br>New removals show up here as the city closes them.
+      ${skipped.size ? `<br><br><button class="linkish" id="unskip">Bring back ${skipped.size} skipped</button>` : ''}</p>`;
+    dock.hidden = true; return;
   }
 
-  const s = list[0];
-  const o = origin();
-  const d = miles(o, s);
-  const walk = Math.max(1, Math.round(d * 20));
+  const known = geo === 'on' && me;
+  const ft = known ? feet(me, t) : null;
+  const arrived = known && ft <= ARRIVE_FT;
+  const canMark = arrived || override || !known;
+
+  // distance readout
+  let readout;
+  if (!known){
+    readout = `<p class="distnum">?</p>
+      <p class="distunit">${geo === 'locating' ? 'finding you…' : 'distance unknown'}</p>`;
+  } else if (arrived){
+    readout = `<p class="arrivedbig">You're here</p>
+      <p class="distunit">within ${Math.round(ft)} ft</p>`;
+  } else if (ft < 1000){
+    readout = `<p class="distnum">${Math.round(ft)}</p><p class="distunit">feet away</p>`;
+  } else {
+    readout = `<p class="distnum">${(ft/5280).toFixed(2)}</p><p class="distunit">miles away</p>`;
+  }
+
+  // dial: compass arrow, arrival check, or nothing
+  let dial = '';
+  if (arrived) dial = `<div class="dial arrived">${HERE_SVG}</div>`;
+  else if (known && compass === 'on' && heading !== null) dial = `<div class="dial">${ARROW_SVG}</div>`;
+
+  // hint line under the address
+  let hint = '';
+  if (geo === 'denied')
+    hint = `<span class="warn">Location is off.</span> <button class="linkish" id="retry-geo">Turn it on</button>`;
+  else if (geo === 'unsupported')
+    hint = `This browser can't do location — mark by eye.`;
+  else if (arrived)
+    hint = `<b>Look at the parkway strip.</b>`;
+  else if (known && compass === 'ask')
+    hint = `<button class="linkish" id="ask-compass">Turn on compass</button> to see which way to walk`;
+  else if (known && !canMark)
+    hint = `Get within ${ARRIVE_FT} ft to check in · <button class="linkish" id="override">Mark from here</button>`;
+  else if (known && override)
+    hint = `Marking from ${Math.round(ft)} ft away`;
+
+  if (known && accuracy && accuracy > 40 && !arrived)
+    hint += `<br><span class="warn">GPS is fuzzy (±${Math.round(accuracy*3.28)} ft)</span>`;
 
   el.innerHTML = `
-    <article class="card focus s-open">
-      <div class="chead">
-        ${glyph('open')}
-        <div class="cmain">
-          <h2 class="addr">${s.address}</h2>
-          <p class="meta">
-            <span class="far">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'}</span>
-            ${me ? 'from you' : 'from home'}<span class="dot">·</span>~${walk} min walk<br>
-            Removal closed ${ago(s.closed)}<span class="dot">·</span>${longDate(s.closed)}
-          </p>
-          <a class="walklink" target="_blank" rel="noopener"
-             href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there →</a>
-        </div>
-      </div>
-    </article>
-    ${list.length > 1 ? `<p class="upnext">${list.length - 1} more nearby after this one</p>` : ''}
+    ${dial}
+    ${readout}
+    <h2 class="addr">${t.address}</h2>
+    <p class="sub">Removal closed ${ago(t.closed)} · ${longDate(t.closed)}</p>
+    <p class="hint">${hint}</p>
+    <a class="walkto" target="_blank" rel="noopener"
+       href="https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}">Open in maps</a>
+    <p class="hint"><button class="linkish" id="skip">Skip this one</button></p>
   `;
 
-  $('#dock').hidden = false;
-  document.body.classList.add('has-dock');
-  $('#dock').innerHTML = `
-    <button class="btn quiet dockskip" data-skip="${s.id}">Skip</button>
-    <button class="btn quiet" data-mark="${s.id}::tree">Tree's there</button>
-    <button class="btn act" data-mark="${s.id}::none">No tree</button>
-  `;
+  dock.hidden = false;
+  dock.classList.toggle('far', !canMark);
+  $('#btn-tree').disabled = !canMark;
+  $('#btn-none').disabled = !canMark;
+  $('#btn-tree').dataset.id = t.id;
+  $('#btn-none').dataset.id = t.id;
+
+  paintArrow();
 }
 
-/* ---------- reviewed view ---------- */
-function renderReviewed(){
-  const list = SITES.filter(s => stateOf(s) === rtab).sort((a,b) => miles(HOME,a) - miles(HOME,b));
-  const el = $('#rlist');
-
-  if (!list.length){
-    const empty = {
-      none:'No confirmed gaps yet.<br>Sites you mark "No tree" in the queue land here, ready to file.',
-      req:'Nothing filed yet.<br>Sites you submit to 311 land here.',
-      tree:'No sites marked as still having a tree.'
-    }[rtab];
-    el.innerHTML = `<p class="msg">${empty}</p>`;
-    $('#moreR').hidden = true;
-    return;
-  }
-
-  el.innerHTML = list.slice(0, shownR).map(s => {
-    const st = stateOf(s);
-    const d = miles(HOME, s);
-    const p = packet(s);
-
-    const fields = Object.keys(p).map((k,i) => `
-      <div class="field">
-        <span class="flabel">${k}</span>
-        <div class="fval">
-          <p>${p[k]}</p>
-          <button class="copy" data-copy="${s.id}::${i}">Copy</button>
-        </div>
-      </div>`).join('');
-
-    let acts = '';
-    if (st === 'none'){
-      acts = `
-        <a class="btn act" target="_blank" rel="noopener"
-           href="https://www.chicago.gov/city/en/depts/streets/provdrs/forestry/svcs/tree_planting.html">Open 311 form</a>
-        <button class="btn solid" data-mark="${s.id}::req">Mark as filed</button>
-        <button class="btn quiet" data-mark="${s.id}::open">Undo</button>`;
-    } else {
-      acts = `<button class="btn quiet" data-mark="${s.id}::open">Move back to check</button>`;
-    }
-
-    return `
-    <article class="card s-${st}">
-      <div class="chead">
-        ${glyph(st)}
-        <div class="cmain">
-          <h2 class="addr">${s.address}</h2>
-          <p class="meta">
-            <span class="far">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'}</span>
-            from ${HOME.label}<span class="dot">·</span>
-            Removal closed ${ago(s.closed)}<span class="dot">·</span>${longDate(s.closed)}<br>
-            ${s.id}
-          </p>
-        </div>
-      </div>
-      <div class="acts">${acts}</div>
-      ${st === 'none' ? `
-        <div class="packet">
-          <h4>Paste this into the 311 request</h4>
-          ${fields}
-          <div class="acts">
-            <button class="btn solid" data-copyall="${s.id}">Copy everything</button>
-            <a class="btn quiet" href="tel:311">Call 311</a>
-          </div>
-        </div>` : ''}
-    </article>`;
-  }).join('');
-
-  $('#moreR').hidden = list.length <= shownR;
-  $('#moreR').textContent = `Show ${Math.min(PAGE, list.length - shownR)} more`;
-}
-
-/* ---------- map view ---------- */
+/* ============================================================
+   MAP SCREEN
+   ============================================================ */
 function ensureMap(){
-  if (map) return;
-  map = L.map('map', { attributionControl: true });
+  if (map || typeof L === 'undefined') return;
+  map = L.map('map', { attributionControl:true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
-  markerLayer = L.layerGroup().addTo(map);
+  layer = L.layerGroup().addTo(map);
 }
 
 function renderMap(){
+  if (typeof L === 'undefined'){
+    $('#map').innerHTML = `<p class="msg">Map library didn't load.<br>Use the Walk screen or "Open in maps".</p>`;
+    return;
+  }
+  ensureMap();
   if (!map) return;
-  markerLayer.clearLayers();
+  layer.clearLayers();
 
-  const list = toCheckList();
-  const o = origin();
-  const points = [[o.lat, o.lng]];
+  const list = queue();
+  const next = list[0];
+  const pts = [];
 
-  L.circleMarker([HOME.lat, HOME.lng], {
-    radius: 8, weight: 2, color: '#fff', fillColor: '#1E5A78', fillOpacity: 1
-  }).addTo(markerLayer).bindPopup(`<b>Home</b><span class="pmeta">${HOME.label}</span>`);
+  if (me){
+    L.circleMarker([me.lat, me.lng], {
+      radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
+    }).addTo(layer).bindPopup(`<b>You</b>`);
+    pts.push([me.lat, me.lng]);
+  }
 
   list.forEach(s => {
-    const d = miles(o, s);
-    const marker = L.circleMarker([s.lat, s.lng], {
-      radius: 8, weight: 2, color: '#fff', fillColor: STATE_COLOR.open, fillOpacity: 1
-    }).addTo(markerLayer);
-
-    marker.bindPopup(`
-      <b>${s.address}</b>
-      <span class="pmeta">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'} away &middot; closed ${ago(s.closed)}</span>
-      <div class="popact">
-        <a class="btn link" target="_blank" rel="noopener"
-           href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there</a>
-        <button class="btn solid" data-mark="${s.id}::none">No tree</button>
-        <button class="btn quiet" data-mark="${s.id}::tree">Tree's there</button>
-      </div>
-    `);
-    points.push([s.lat, s.lng]);
+    const isNext = next && s.id === next.id;
+    L.circleMarker([s.lat, s.lng], {
+      radius: isNext ? 10 : 7, weight:2, color:'#fff',
+      fillColor: isNext ? '#E2330A' : '#0B0B0C', fillOpacity:1
+    }).addTo(layer).bindPopup(
+      `<b>${s.address}</b><span class="pm">${Math.round(feet(from(), s))} ft away · closed ${ago(s.closed)}</span>`
+    );
+    pts.push([s.lat, s.lng]);
   });
 
-  if (points.length > 1) map.fitBounds(points, { padding: [28,28], maxZoom: 16 });
-  else map.setView(points[0], 15);
+  if (pts.length > 1) map.fitBounds(pts, { padding:[30,30], maxZoom:17 });
+  else if (pts.length) map.setView(pts[0], 16);
+  else map.setView([HOME.lat, HOME.lng], 15);
 }
 
-/* ---------- mode / toolbar ---------- */
-function syncToolbarUI(){
-  document.querySelectorAll('.chip[data-mode]').forEach(c =>
-    c.setAttribute('aria-pressed', String(c.dataset.mode === mode)));
-  document.querySelectorAll('.chip[data-rtab]').forEach(c =>
-    c.setAttribute('aria-pressed', String(c.dataset.rtab === rtab)));
-}
+/* ============================================================
+   SAVED SCREEN
+   ============================================================ */
+function renderSaved(){
+  const list = SITES.filter(s => stateOf(s) === stab).sort((a,b) => miles(HOME,a) - miles(HOME,b));
+  const el = $('#savedlist');
 
-function applyMode(){
-  $('#queueview').hidden = mode !== 'queue';
-  $('#mapview').hidden = mode !== 'map';
-  $('#reviewedview').hidden = mode !== 'reviewed';
-  if (mode !== 'queue'){ $('#dock').hidden = true; document.body.classList.remove('has-dock'); }
-
-  if (mode === 'map'){
-    ensureMap();
-    renderMap();
-    requestAnimationFrame(() => map.invalidateSize());
-  } else if (mode === 'queue'){
-    renderQueue();
-  } else if (mode === 'reviewed'){
-    renderReviewed();
+  if (!list.length){
+    el.innerHTML = `<p class="msg">${{
+      none:'Nothing to file yet.<br>Sites you mark "No tree" collect here with a ready-to-paste 311 request.',
+      req:'Nothing filed yet.',
+      tree:'No sites marked as still having a tree.'
+    }[stab]}</p>`;
+    return;
   }
+
+  el.innerHTML = list.slice(0, shownSaved).map(s => {
+    const st = stateOf(s);
+    const p = packet(s);
+    const fields = Object.keys(p).map((k,i) => `
+      <div class="field">
+        <span class="flabel">${k}</span>
+        <div class="fval"><p>${p[k]}</p>
+        <button class="copy" data-copy="${s.id}::${i}">Copy</button></div>
+      </div>`).join('');
+
+    const acts = st === 'none' ? `
+        <a class="mini hot" target="_blank" rel="noopener"
+           href="https://www.chicago.gov/city/en/depts/streets/provdrs/forestry/svcs/tree_planting.html">Open 311 form</a>
+        <button class="mini fill" data-mark="${s.id}::req">Mark as filed</button>
+        <button class="mini ghost" data-mark="${s.id}::open">Undo</button>`
+      : `<button class="mini ghost" data-mark="${s.id}::open">Back to check</button>`;
+
+    return `<article class="card k-${st}">
+      <h3>${s.address}</h3>
+      <p class="cm">${(miles(HOME,s)).toFixed(2)} mi from ${HOME.label} ·
+        closed ${ago(s.closed)} · ${s.id}</p>
+      <div class="row">${acts}</div>
+      ${st === 'none' ? `<div class="packet"><h4>Paste this into the 311 request</h4>${fields}
+        <div class="row">
+          <button class="mini fill" data-copyall="${s.id}">Copy everything</button>
+          <a class="mini ghost" href="tel:311">Call 311</a>
+        </div></div>` : ''}
+    </article>`;
+  }).join('') + (list.length > shownSaved
+    ? `<button class="mini ghost" id="moresaved" style="width:100%">Show ${Math.min(PAGE, list.length-shownSaved)} more</button>`
+    : '');
 }
 
-function refresh(){
-  updateCounts();
-  if (mode === 'queue') renderQueue();
-  else if (mode === 'reviewed') renderReviewed();
-  if (mode === 'map') renderMap();
-}
+/* ============================================================
+   TABS
+   ============================================================ */
+function applyTab(){
+  $('#walk').hidden        = tab !== 'walk';
+  $('#mapscreen').hidden   = tab !== 'map';
+  $('#savedscreen').hidden = tab !== 'saved';
+  $('#dock').hidden        = tab !== 'walk';
 
-/* ---------- live location ---------- */
-function startLocating(){
-  if (!navigator.geolocation){ geoState = 'unsupported'; renderLocline(); return; }
-  geoState = 'locating'; renderLocline();
-  if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
-  geoWatchId = navigator.geolocation.watchPosition(
-    pos => {
-      me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      geoState = 'granted';
-      if (mode === 'queue') renderQueue();
-      if (mode === 'map') renderMap();
-    },
-    () => {
-      me = null; geoState = 'denied';
-      if (mode === 'queue') renderQueue();
-    },
-    { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 }
-  );
+  document.querySelectorAll('.tab[data-tab]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+
+  if (tab === 'walk') renderWalk();
+  if (tab === 'map'){ renderMap(); requestAnimationFrame(() => map && map.invalidateSize()); }
+  if (tab === 'saved') renderSaved();
 }
 
 /* ============================================================
    EVENTS
    ============================================================ */
 document.addEventListener('click', async e => {
-  const chip = e.target.closest('.chip');
-  if (chip){
-    const group = chip.dataset.mode ? 'mode' : 'rtab';
-    document.querySelectorAll(`.chip[data-${group}]`).forEach(c => c.setAttribute('aria-pressed','false'));
-    chip.setAttribute('aria-pressed','true');
-    if (group === 'mode'){ mode = chip.dataset.mode; applyMode(); }
-    else { rtab = chip.dataset.rtab; shownR = PAGE; renderReviewed(); }
+  const tb = e.target.closest('.tab[data-tab]');
+  if (tb){ tab = tb.dataset.tab; applyTab(); return; }
+
+  const sb = e.target.closest('.tab[data-stab]');
+  if (sb){
+    stab = sb.dataset.stab; shownSaved = PAGE;
+    document.querySelectorAll('.tab[data-stab]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.stab === stab)));
+    renderSaved(); return;
+  }
+
+  const act = e.target.closest('.act');
+  if (act && !act.disabled){
+    const id = act.dataset.id;
+    marks[id] = { state: act.id === 'btn-none' ? 'none' : 'tree', at: new Date().toISOString() };
+    override = false;
+    await Store.set('stump.marks', JSON.stringify(marks));
+    renderWalk();
     return;
   }
 
-  const jump = e.target.closest('[data-jump]');
-  if (jump){
-    mode = 'reviewed'; rtab = jump.dataset.jump; shownR = PAGE;
-    syncToolbarUI(); applyMode(); return;
+  if (e.target.closest('#skip')){
+    const t = target(); if (t) skipped.add(t.id);
+    override = false; renderWalk(); return;
   }
+  if (e.target.closest('#unskip')){ skipped.clear(); renderWalk(); return; }
+  if (e.target.closest('#override')){ override = true; renderWalk(); return; }
+  if (e.target.closest('#retry-geo')){ startGeo(); return; }
+  if (e.target.closest('#ask-compass')){ startCompass(); return; }
+  if (e.target.closest('#moresaved')){ shownSaved += PAGE; renderSaved(); return; }
 
-  const retry = e.target.closest('#retry-loc');
-  if (retry){ startLocating(); return; }
-
-  const skip = e.target.closest('[data-skip]');
-  if (skip){ skipped.add(skip.dataset.skip); renderQueue(); return; }
-
-  const mark = e.target.closest('[data-mark]');
-  if (mark){
-    const [id, state] = mark.dataset.mark.split('::');
-    if (state === 'open') delete marks[id];
-    else marks[id] = { state, at:new Date().toISOString() };
+  const mk = e.target.closest('[data-mark]');
+  if (mk){
+    const [id, st] = mk.dataset.mark.split('::');
+    if (st === 'open') delete marks[id]; else marks[id] = { state:st, at:new Date().toISOString() };
     skipped.delete(id);
     await Store.set('stump.marks', JSON.stringify(marks));
-    if (mode === 'map' && map) map.closePopup();
-    refresh(); return;
+    renderSaved(); renderWalk(); return;
   }
 
   const one = e.target.closest('[data-copy]');
   if (one){
-    const [id, idx] = one.dataset.copy.split('::');
+    const [id, i] = one.dataset.copy.split('::');
     const s = SITES.find(x => x.id === id);
-    const val = Object.values(packet(s))[+idx];
-    copy(val, one); return;
+    copy(Object.values(packet(s))[+i], one); return;
   }
-
   const all = e.target.closest('[data-copyall]');
   if (all){
     const s = SITES.find(x => x.id === all.dataset.copyall);
-    copy(packetText(s), all, 'Copied'); return;
+    copy(packetText(s), all); return;
   }
-
-  if (e.target.id === 'moreR'){ shownR += PAGE; renderReviewed(); }
 });
 
-function copy(text, btn, label){
+function copy(text, btn){
   const done = () => {
     const old = btn.textContent;
-    btn.textContent = label || 'Copied';
-    btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1400);
+    btn.textContent = 'Copied'; btn.classList.add('done');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1400);
   };
-  if (navigator.clipboard && window.isSecureContext){
-    navigator.clipboard.writeText(text).then(done, () => fallback(text, done));
-  } else fallback(text, done);
+  if (navigator.clipboard && window.isSecureContext)
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
 }
-function fallback(text, done){
+function fallbackCopy(text, done){
   const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
   document.body.appendChild(ta); ta.select();
   try{ document.execCommand('copy'); done(); }catch(e){}
   document.body.removeChild(ta);
@@ -813,9 +825,9 @@ function fallback(text, done){
    BOOT
    ============================================================ */
 (async function init(){
-  $('#queueview').hidden = false;
-  $('#focus').innerHTML = `<p class="msg"><span class="spin">◌</span><br>Reading Chicago 311…</p>`;
-  startLocating();
+  renderWalk();
+  startGeo();
+  initCompass();
 
   try{
     const saved = await Store.get('stump.marks');
@@ -824,15 +836,15 @@ function fallback(text, done){
 
   try{
     SITES = await loadSites();
-    $('#bar').hidden = false;
+    $('#tabs').hidden = false;
     $('#stamp').textContent = 'Loaded ' + new Date().toLocaleString('en-US',
       {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) +
-      ' · ' + SITES.length + ' sites with no follow-up planting request';
-    updateCounts();
-    applyMode();
+      ' · ' + SITES.length + ' open sites';
+    applyTab();
   }catch(err){
-    $('#focus').innerHTML = `<p class="msg err"><b>Could not reach the city data portal.</b>
-      ${err.message}<br>Pull down to refresh, or try again in a minute.</p>`;
+    $('#walk').innerHTML = `<p class="msg bad"><b>Can't reach the city</b>
+      ${err.message}<br>Pull to refresh, or try again in a minute.</p>`;
+    $('#dock').hidden = true;
   }
 })();
 </script>
