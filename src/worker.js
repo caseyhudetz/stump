@@ -32,6 +32,17 @@ function stampedNow(at, now) {
   return at;
 }
 
+/**
+ * One mark, normalized. Only known fields survive, so a client cannot grow
+ * the stored record arbitrarily — but `by` has to be carried through, or
+ * attribution on a shared report would be dropped on the first sync.
+ */
+function clean(m, now) {
+  const out = { state: m.state, at: stampedNow(m.at, now) };
+  if (typeof m.by === 'string' && m.by.trim()) out.by = m.by.trim().slice(0, 40);
+  return out;
+}
+
 /** Last write wins per site, compared on the mark's own timestamp. */
 function merge(base, incoming) {
   const out = { ...base };
@@ -39,7 +50,7 @@ function merge(base, incoming) {
   for (const id of Object.keys(incoming || {})) {
     const next = incoming[id];
     if (!next || typeof next !== 'object' || typeof next.state !== 'string') continue;
-    const stamped = { state: next.state, at: stampedNow(next.at, now) };
+    const stamped = clean(next, now);
     const cur = out[id];
     if (!cur || !cur.at || stamped.at >= cur.at) out[id] = stamped;
   }
@@ -63,7 +74,7 @@ async function read(env) {
   for (const id of Object.keys(parsed)) {
     const m = parsed[id];
     if (!m || typeof m !== 'object' || typeof m.state !== 'string') continue;
-    out[id] = { state: m.state, at: stampedNow(m.at, now) };
+    out[id] = clean(m, now);
   }
   return out;
 }

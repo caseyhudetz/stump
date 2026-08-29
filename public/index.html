@@ -222,6 +222,23 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
 
 /* ---------- states ---------- */
+.undobar{
+  display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;
+  background:var(--wash);border:1px solid var(--line);padding:.7rem .8rem;margin-bottom:1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
+}
+.undobar .mini{flex:0 0 auto;min-width:auto;min-height:2.4rem;font-size:.76rem}
+.who{
+  font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
+  margin:1rem 0 0;text-align:center;
+}
+.linkish{font:inherit;color:var(--ink);background:none;border:0;padding:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.guest{
+  background:var(--wash);border-left:4px solid var(--ink);
+  padding:.85rem .9rem;margin-bottom:1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.7;color:var(--ink);
+}
 .msg{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--dim);
   text-align:center;line-height:1.75;padding:2.5rem 1rem}
 .msg b{display:block;font-family:'Archivo',sans-serif;font-size:1.15rem;color:var(--ink);
@@ -265,7 +282,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         <button class="chip" data-sort="near" aria-pressed="false">Nearest home</button>
         <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
         <button class="chip" data-sort="todo" aria-pressed="false">Unchecked only</button>
+        <button class="chip" data-share="all">Share Stump</button>
       </div>
+      <div id="guestnote"></div>
       <p class="count" id="count"></p>
       <div id="list"></div>
       <div id="mapwrap" hidden>
@@ -303,7 +322,7 @@ const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
-const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7g9EAC';
+const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7gBEAS&language=en_US';
 
 const REMOVALS_SINCE = (() => {
   const d = new Date();
@@ -529,6 +548,9 @@ let SITES = [];
 let tab = 'browse', view = 'list', sort = 'street', todoOnly = false;
 let query = '', detailId = null;
 let map = null, layer = null, mini = null;
+let lastUndo = null;     // {id, address, prev} so an undo can be taken back
+let reporter = '';       // optional name, so shared reports say who checked
+let guest = false;       // arrived through someone else's share link
 
 const stateOf = s => (marks[s.id] && marks[s.id].state) || 'open';
 const byId = id => SITES.find(s => s.id === id);
@@ -660,8 +682,11 @@ function renderDetail(){
          href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Directions</a>
       <a class="mini ghost" target="_blank" rel="noopener"
          href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${s.lat},${s.lng}">Street view</a>
+      <button class="mini ghost" data-share="${esc(s.id)}">Ask someone to check</button>
     </div>
     <div style="margin-top:1.3rem">${choices}</div>
+    <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
+      <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></p>
   `;
 
   // small map so you can confirm you're looking at the right pit
@@ -685,12 +710,18 @@ function renderTasks(){
   const todo = tasks(), done = doneTasks();
   const el = $('#tasklist');
 
+  // an undo is itself undoable, so a mis-tap here costs nothing
+  const undoBar = lastUndo
+    ? `<div class="undobar">Removed <b>${esc(lastUndo.address)}</b>
+         <button class="mini ghost" id="restore">Restore it</button></div>`
+    : '';
+
   const badge = $('#taskbadge');
   badge.hidden = !todo.length;
   badge.textContent = todo.length;
 
   if (!todo.length && !done.length){
-    el.innerHTML = `<p class="msg"><b>No tasks yet</b>
+    el.innerHTML = undoBar + `<p class="msg"><b>No tasks yet</b>
       Report a site as “No tree” and a filing task shows up here,
       with the 311 wording already written for you.</p>`;
     return;
@@ -704,9 +735,11 @@ function renderTasks(){
         <div class="fval"><p>${esc(p[k])}</p>
         <button class="copy" data-copy="${esc(s.id)}::${i}">Copy</button></div>
       </div>`).join('');
+    const by = marks[s.id].by;
     return `<article class="task${isDone?' done':''}">
       <h3>${esc(s.address)}</h3>
-      <p class="tm">Reported ${ago(marks[s.id].at)} · removal ${s.id} closed ${longDate(s.closed)}</p>
+      <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''} ·
+        removal ${s.id} closed ${longDate(s.closed)}</p>
       ${isDone ? `<div class="btnrow">
           <button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen</button>
         </div>`
@@ -723,11 +756,14 @@ function renderTasks(){
         <div class="btnrow">
           <button class="mini fill" data-mark="${esc(s.id)}::req">Mark as filed</button>
           <a class="mini ghost" href="tel:311">Call 311</a>
+        </div>
+        <div class="btnrow">
+          <button class="mini ghost" data-undo="${esc(s.id)}">Undo — remove this task</button>
         </div>`}
     </article>`;
   };
 
-  el.innerHTML =
+  el.innerHTML = undoBar +
     (todo.length ? `<p class="count">${todo.length} to file</p>` + todo.map(s => card(s,false)).join('') : '') +
     (done.length ? `<p class="count" style="margin-top:1.5rem">${done.length} filed</p>` +
                    done.map(s => card(s,true)).join('') : '');
@@ -739,6 +775,15 @@ function renderTasks(){
 function repaint(){
   const open = SITES.filter(s => stateOf(s) === 'open').length;
   $('#leftcount').textContent = SITES.length ? open + ' unchecked' : '—';
+
+  const gn = $('#guestnote');
+  if (gn) gn.innerHTML = guest
+    ? `<div class="guest">Thanks for helping check the 44th Ward.
+         Open a site, look at the parkway strip, and say whether a tree is there.
+         Your reports go to the shared list.<br>
+         Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
+         <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></div>`
+    : '';
   const badge = $('#taskbadge');
   badge.hidden = !tasks().length;
   badge.textContent = tasks().length;
@@ -795,10 +840,46 @@ document.addEventListener('click', async e => {
   if (mk){
     const [id, st] = mk.dataset.mark.split('::');
     marks[id] = { state: st, at: new Date().toISOString() };
+    if (reporter) marks[id].by = reporter;
+    lastUndo = null;
     await saveMarks();
     // reporting "no tree" is the moment a task is born — take them to it
     if (st === 'none' && detailId === id){ tab = 'tasks'; detailId = null; }
     repaint();
+    return;
+  }
+
+  const un = e.target.closest('[data-undo]');
+  if (un){
+    const id = un.dataset.undo, s = byId(id);
+    lastUndo = { id, address: s ? s.address : id, prev: marks[id] };
+    marks[id] = { state:'open', at:new Date().toISOString() };
+    if (reporter) marks[id].by = reporter;
+    await saveMarks();
+    repaint();
+    return;
+  }
+
+  if (e.target.closest('#restore')){
+    if (lastUndo){
+      marks[lastUndo.id] = { ...lastUndo.prev, at:new Date().toISOString() };
+      lastUndo = null;
+      await saveMarks();
+    }
+    repaint();
+    return;
+  }
+
+  const sh = e.target.closest('[data-share]');
+  if (sh){ shareLink(sh.dataset.share === 'all' ? null : sh.dataset.share, sh); return; }
+
+  if (e.target.closest('#set-name')){
+    const name = prompt('Your name (so reports say who checked the site):', reporter || '');
+    if (name !== null){
+      reporter = name.trim().slice(0,40);
+      await Store.set('stump.by', reporter);
+      repaint();
+    }
     return;
   }
 
@@ -817,6 +898,20 @@ document.addEventListener('input', e => {
   clearTimeout(qt);
   qt = setTimeout(() => { query = e.target.value; renderBrowse(); }, 150);
 });
+
+/* Share the whole survey, or one site to go and look at. */
+async function shareLink(siteId, btn){
+  const s = siteId ? byId(siteId) : null;
+  const url = location.origin + location.pathname + (s ? '?site=' + encodeURIComponent(s.id) : '');
+  const title = s ? `Check the parkway at ${s.address}` : 'Stump — 44th Ward parkway trees';
+  const text = s
+    ? `Is there a tree in the parkway at ${s.address}? Tap to report what you see.`
+    : `Help check which parkway tree pits in the 44th Ward are still empty.`;
+  try{
+    if (navigator.share){ await navigator.share({ title, text, url }); return; }
+  }catch(e){ if (e && e.name === 'AbortError') return; }
+  copy(url, btn);
+}
 
 function copy(text, btn){
   const done = () => {
@@ -846,6 +941,7 @@ function fallbackCopy(text, done){
     const saved = await Store.get('stump.marks');
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
+  reporter = (await Store.get('stump.by')) || '';
 
   await pullMarks({ quiet:true });
   if (Object.keys(marks).length) await pushMarks();
@@ -856,6 +952,18 @@ function fallbackCopy(text, done){
     $('#tabs').hidden = false;
     $('#stamp').textContent = 'Loaded ' + new Date().toLocaleString('en-US',
       {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' · ' + SITES.length + ' sites';
+
+    // ?site=SR123 — someone was sent here to check one specific address.
+    // "New here" has to be a fact about this device: the shared store means
+    // everyone pulls everyone's marks, so an empty mark list proves nothing.
+    const firstVisit = !(await Store.get('stump.visited'));
+    await Store.set('stump.visited', new Date().toISOString());
+    const want = new URLSearchParams(location.search).get('site');
+    if (want){
+      guest = firstVisit;
+      if (byId(want)) detailId = want;
+      history.replaceState(null, '', location.pathname);
+    }
     repaint();
   }catch(err){
     $('#list').innerHTML = `<p class="msg bad"><b>Can't reach the city</b>
