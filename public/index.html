@@ -218,7 +218,18 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   text-transform:uppercase;letter-spacing:.09em;color:var(--dim);margin:0}
 .fact dd{margin:0;font-size:.92rem;text-align:right;
   font-variation-settings:'wdth' 92,'wght' 600}
-#minimap{height:190px;width:100%;border:1px solid var(--line);background:var(--wash);margin-bottom:1rem}
+.mapbox{position:relative;margin-bottom:1rem}
+#minimap{height:260px;width:100%;border:1px solid var(--line);background:var(--wash)}
+/* above Leaflet's own controls, clear of the zoom buttons and attribution */
+.recenter{
+  position:absolute;left:.5rem;bottom:.5rem;z-index:1000;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  text-transform:uppercase;letter-spacing:.07em;
+  background:var(--paper);color:var(--ink);border:1px solid var(--ink);
+  padding:.4rem .55rem;cursor:pointer;border-radius:0;
+}
+.recenter:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.leaflet-control-attribution{font-size:.55rem}
 .state{
   padding:.8rem .9rem;margin-bottom:1rem;
   font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
@@ -648,6 +659,7 @@ let tab = 'browse', view = 'list', sort = 'street', todoOnly = false;
 let query = '', detailId = null;
 let map = null, layer = null, mini = null;
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
+let miniView = null;       // {id, center, zoom} — keeps where you panned/zoomed to
 
 /* Leaflet has to let go of its container before innerHTML replaces it. */
 function killMini(){
@@ -800,7 +812,10 @@ function renderDetail(){
     </div>
 
     ${banner}
-    <div id="minimap"></div>
+    <div class="mapbox">
+      <div id="minimap"></div>
+      <button class="recenter" id="recenter">Recenter</button>
+    </div>
 
     <details class="more"${detailsOpen ? ' open' : ''}>
       <summary>Details</summary>
@@ -820,13 +835,40 @@ function renderDetail(){
   $('#dock').innerHTML = choices;
   $('#dock').hidden = false;
 
-  // small map so you can confirm you're looking at the right pit
+  // pannable, zoomable map so you can study the pit before answering
   if (typeof L !== 'undefined'){
-    mini = L.map('minimap', { attributionControl:false, zoomControl:false, dragging:false,
-      scrollWheelZoom:false, doubleClickZoom:false, touchZoom:false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(mini);
-    L.circleMarker([s.lat,s.lng], { radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1 }).addTo(mini);
-    mini.setView([s.lat,s.lng], 17);
+    mini = L.map('minimap', {
+      zoomControl: true,
+      dragging: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      // Wheel zoom stays off until the map is clicked, otherwise scrolling
+      // the card past the map would zoom it instead of moving the page.
+      scrollWheelZoom: false
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(mini);
+    L.circleMarker([s.lat,s.lng], {
+      radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1
+    }).addTo(mini);
+
+    mini.on('click',      () => mini.scrollWheelZoom.enable());
+    mini.on('mouseout',   () => mini.scrollWheelZoom.disable());
+
+    // Keep whatever you panned or zoomed to. A sync pull re-renders this
+    // card, and snapping back to the default view mid-inspection would be
+    // the same annoyance the Details disclosure used to have.
+    const keep = miniView && miniView.id === s.id;
+    mini.setView(keep ? miniView.center : [s.lat,s.lng], keep ? miniView.zoom : 18);
+    const remember = () => {
+      const c = mini.getCenter();
+      miniView = { id: s.id, center: [c.lat, c.lng], zoom: mini.getZoom() };
+    };
+    mini.on('moveend', remember);
+    mini.on('zoomend', remember);
+
     requestAnimationFrame(() => mini.invalidateSize());
   } else {
     $('#minimap').hidden = true;
@@ -939,6 +981,12 @@ document.addEventListener('click', async e => {
     tab = 'tasks'; detailId = null; closeSort(); repaint(); return;
   }
   if (e.target.closest('#backsites')){ tab = 'browse'; repaint(); return; }
+
+  if (e.target.closest('#recenter')){
+    const s = byId(detailId);
+    if (s && mini){ miniView = null; mini.setView([s.lat, s.lng], 18); }
+    return;
+  }
 
   if (e.target.closest('#sortbtn')){
     const p = $('#sortpanel');
