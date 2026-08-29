@@ -286,6 +286,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
 
 /* ---------- states ---------- */
+.offbar{
+  background:#FDF0EC;border-left:4px solid var(--hot);
+  padding:.85rem .9rem;margin-bottom:1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.7;color:var(--ink);
+}
 .undobar{
   display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;
   background:var(--wash);border:1px solid var(--line);padding:.7rem .8rem;margin-bottom:1rem;
@@ -456,8 +461,13 @@ function mergeMarks(base, incoming){
 function paintSync(){
   const el = $('#sync');
   if (el){
-    el.textContent = { on:'synced', saving:'saving…', offline:'saved on device', off:'', idle:'' }[sync] || '';
-    el.className = 'sync' + (sync === 'offline' ? ' warn' : '');
+    // "off" used to render blank, which made a broken sync look identical to
+    // a working one — you only found out by arriving at the other device.
+    el.textContent = {
+      on:'synced', saving:'saving…', offline:'saved on device',
+      off:'this device only', idle:''
+    }[sync] || '';
+    el.className = 'sync' + (sync === 'offline' || sync === 'off' ? ' warn' : '');
   }
   const note = $('#storagenote');
   if (note) note.textContent = sync === 'off'
@@ -829,8 +839,17 @@ function renderTasks(){
          <button class="mini ghost" id="restore">Restore it</button></div>`
     : '';
 
+  // If the server has nowhere to store anything, say so where the
+  // consequence lands: these tasks are not going to reach another device.
+  const offBar = sync === 'off'
+    ? `<div class="offbar"><b>Not syncing.</b> These tasks live on this device
+         only — they won't appear on your desktop, and reports from anyone you
+         shared with won't arrive here. Sync needs a KV namespace on the
+         Worker.</div>`
+    : '';
+
   if (!todo.length && !done.length){
-    el.innerHTML = undoBar + `<p class="msg"><b>No tasks yet</b>
+    el.innerHTML = offBar + undoBar + `<p class="msg"><b>No tasks yet</b>
       Report a site as “No tree” and a filing task shows up here,
       with the 311 wording already written for you.</p>`;
     return;
@@ -872,7 +891,7 @@ function renderTasks(){
     </article>`;
   };
 
-  el.innerHTML = undoBar +
+  el.innerHTML = offBar + undoBar +
     (todo.length ? `<p class="count">${todo.length} to file</p>` + todo.map(s => card(s,false)).join('') : '') +
     (done.length ? `<p class="count" style="margin-top:1.5rem">${done.length} filed</p>` +
                    done.map(s => card(s,true)).join('') : '');
