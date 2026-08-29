@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
   --concrete:#E6E6E1;
@@ -26,6 +27,7 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
+[hidden]{display:none!important}
 body{
   background:var(--concrete);
   color:var(--bark);
@@ -43,9 +45,9 @@ header{
   position:sticky;top:0;z-index:20;
   background:var(--concrete);
   border-bottom:1px solid var(--rule);
-  padding-top:env(safe-area-inset-top);
+  padding-top:calc(env(safe-area-inset-top) + .65rem);
 }
-.mast{display:flex;align-items:baseline;gap:.6rem;padding:.85rem 0 .55rem}
+.mast{display:flex;align-items:baseline;gap:.6rem;padding:0 0 .55rem}
 .logo{
   font-variation-settings:'wdth' 68,'wght' 800;
   font-size:1.85rem;letter-spacing:.06em;text-transform:uppercase;
@@ -111,21 +113,27 @@ header{
 .meta .far{color:var(--bark);font-weight:500}
 
 /* ---------- buttons ---------- */
-.acts{display:flex;gap:.45rem;margin-top:.75rem;flex-wrap:wrap}
+.acts{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
 button.btn,a.btn{
   font-family:'Archivo',sans-serif;
   font-variation-settings:'wdth' 88,'wght' 600;
   font-size:.85rem;letter-spacing:.01em;
-  padding:.6rem .85rem;border-radius:2px;
+  padding:.7rem .85rem;border-radius:2px;
   border:1px solid var(--bark);background:transparent;color:var(--bark);
-  cursor:pointer;text-decoration:none;display:inline-block;
-  flex:1;text-align:center;min-width:fit-content;
+  cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:1;text-align:center;min-width:fit-content;min-height:2.75rem;
 }
 .btn:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
 .btn.solid{background:var(--bark);color:var(--concrete)}
 .btn.act{background:var(--paint);border-color:var(--paint);color:#fff}
 .btn.quiet{border-color:var(--rule);color:var(--stone);flex:0 0 auto}
 .btn.link{border-color:var(--rule);color:var(--sky)}
+/* mobile-first: stack action buttons full-width so they're easy to hit one-handed */
+@media (max-width:430px){
+  .acts{flex-direction:column}
+  .acts .btn{flex:1 1 auto;width:100%}
+}
 
 /* ---------- packet ---------- */
 .packet{
@@ -152,6 +160,36 @@ button.btn,a.btn{
   padding:.28rem .45rem;border-radius:2px;cursor:pointer;flex:0 0 auto;
 }
 .copy.ok{background:var(--leaf);border-color:var(--leaf);color:#fff}
+
+/* ---------- map ---------- */
+#mapview{margin:.7rem 0}
+#map{
+  height:65vh;min-height:320px;width:100%;
+  border:1px solid var(--rule);background:var(--card);
+}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{
+  background:var(--card);color:var(--bark);border-radius:2px;
+}
+.leaflet-popup-content{
+  font-family:'Archivo',sans-serif;font-size:.85rem;line-height:1.4;
+  margin:.7rem .8rem;min-width:170px;
+}
+.leaflet-popup-content b{
+  display:block;font-variation-settings:'wdth' 72,'wght' 700;
+  text-transform:uppercase;font-size:1rem;margin-bottom:.2rem;
+}
+.leaflet-popup-content .pmeta{
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
+}
+.popact{display:flex;gap:.35rem;margin-top:.55rem;flex-wrap:wrap}
+.popact .btn{padding:.4rem .55rem;font-size:.72rem;min-height:auto;flex:0 0 auto;width:auto}
+.maplegend{
+  display:flex;gap:.9rem;flex-wrap:wrap;padding:.55rem 0 0;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--stone);
+}
+.maplegend span{display:inline-flex;align-items:center;gap:.3rem}
+.maplegend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
 
 /* ---------- states ---------- */
 .msg{
@@ -195,6 +233,9 @@ footer a{color:var(--sky)}
 
 <main class="wrap">
   <div class="bar" id="bar" hidden>
+    <span class="barlabel">View</span>
+    <button class="chip" data-mode="list" aria-pressed="true">List</button>
+    <button class="chip" data-mode="map" aria-pressed="false">Map</button>
     <span class="barlabel">Show</span>
     <button class="chip" data-view="open" aria-pressed="true">To check</button>
     <button class="chip" data-view="none" aria-pressed="false">No tree</button>
@@ -209,6 +250,17 @@ footer a{color:var(--sky)}
   <div id="list"></div>
   <button class="btn quiet more" id="more" hidden>Show 5 more</button>
 
+  <div id="mapview" hidden>
+    <div id="map"></div>
+    <div class="maplegend">
+      <span><i style="background:#75726A"></i>To check</span>
+      <span><i style="background:#DE4B12"></i>No tree</span>
+      <span><i style="background:#2F6B45"></i>Requested</span>
+      <span><i style="background:#B8B6AE"></i>Has tree</span>
+      <span><i style="background:#1E5A78"></i>Home</span>
+    </div>
+  </div>
+
   <footer>
     Data: Chicago 311 service requests, queried live from the city open data portal.<br>
     A site appears here when a Tree Removal Inspection closed as Completed in the
@@ -218,6 +270,7 @@ footer a{color:var(--sky)}
   </footer>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 /* ============================================================
    CONFIG
@@ -407,7 +460,9 @@ function packetText(s){
 /* ============================================================
    RENDER
    ============================================================ */
-let SITES = [], view = 'open', sort = 'home', shown = PAGE, me = null;
+let SITES = [], view = 'open', sort = 'home', mode = 'list', shown = PAGE, me = null;
+const STATE_COLOR = {open:'#75726A', none:'#DE4B12', tree:'#B8B6AE', req:'#2F6B45'};
+let map = null, markerLayer = null;
 
 function stateOf(s){ return (marks[s.id] && marks[s.id].state) || 'open'; }
 
@@ -501,8 +556,78 @@ function render(){
     </article>`;
   }).join('');
 
-  $('#more').hidden = list.length <= shown;
+  $('#more').hidden = mode === 'map' || list.length <= shown;
   $('#more').textContent = `Show ${Math.min(PAGE, list.length - shown)} more`;
+}
+
+/* ---------- map view ---------- */
+function ensureMap(){
+  if (map) return;
+  map = L.map('map', { attributionControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+}
+
+function renderMap(){
+  if (!map) return;
+  markerLayer.clearLayers();
+
+  const list = visible();
+  const origin = (sort === 'me' && me) ? me : HOME;
+  const points = [[origin.lat ?? HOME.lat, origin.lng ?? HOME.lng]];
+
+  L.circleMarker([HOME.lat, HOME.lng], {
+    radius: 8, weight: 2, color: '#fff', fillColor: '#1E5A78', fillOpacity: 1
+  }).addTo(markerLayer).bindPopup(`<b>Home</b><span class="pmeta">${HOME.label}</span>`);
+
+  list.forEach(s => {
+    const st = stateOf(s);
+    const d = miles(origin, s);
+    const marker = L.circleMarker([s.lat, s.lng], {
+      radius: 8, weight: 2, color: '#fff', fillColor: STATE_COLOR[st], fillOpacity: 1
+    }).addTo(markerLayer);
+
+    let acts = '';
+    if (st === 'open'){
+      acts = `
+        <a class="btn link" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there</a>
+        <button class="btn solid" data-mark="${s.id}::none">No tree</button>`;
+    } else if (st === 'none'){
+      acts = `<button class="btn solid" data-mark="${s.id}::req">Mark as filed</button>`;
+    }
+
+    marker.bindPopup(`
+      <b>${s.address}</b>
+      <span class="pmeta">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'} away &middot; closed ${ago(s.closed)}</span>
+      ${acts ? `<div class="popact">${acts}</div>` : ''}
+    `);
+    points.push([s.lat, s.lng]);
+  });
+
+  if (points.length > 1) map.fitBounds(points, { padding: [28,28], maxZoom: 16 });
+  else map.setView(points[0], 15);
+}
+
+function syncMode(){
+  $('#list').hidden = mode === 'map';
+  $('#mapview').hidden = mode !== 'map';
+  if (mode === 'map'){
+    $('#more').hidden = true;
+    ensureMap();
+    renderMap();
+    requestAnimationFrame(() => map.invalidateSize());
+  } else {
+    render();
+  }
+}
+
+function refresh(){
+  render();
+  if (mode === 'map') renderMap();
 }
 
 /* ============================================================
@@ -511,21 +636,22 @@ function render(){
 document.addEventListener('click', async e => {
   const chip = e.target.closest('.chip');
   if (chip){
-    const group = chip.dataset.view ? 'view' : 'sort';
+    const group = chip.dataset.mode ? 'mode' : chip.dataset.view ? 'view' : 'sort';
     document.querySelectorAll(`.chip[data-${group}]`).forEach(c => c.setAttribute('aria-pressed','false'));
     chip.setAttribute('aria-pressed','true');
+    if (group === 'mode'){ mode = chip.dataset.mode; syncMode(); return; }
     if (group === 'view'){ view = chip.dataset.view; shown = PAGE; }
     else {
       sort = chip.dataset.sort;
       if (sort === 'me' && !me && navigator.geolocation){
         navigator.geolocation.getCurrentPosition(
-          pos => { me = {lat:pos.coords.latitude, lng:pos.coords.longitude}; render(); },
-          ()  => { me = null; render(); },
+          pos => { me = {lat:pos.coords.latitude, lng:pos.coords.longitude}; refresh(); },
+          ()  => { me = null; refresh(); },
           {enableHighAccuracy:true, timeout:8000}
         );
       }
     }
-    render(); return;
+    refresh(); return;
   }
 
   const mark = e.target.closest('[data-mark]');
@@ -534,7 +660,8 @@ document.addEventListener('click', async e => {
     if (state === 'open') delete marks[id];
     else marks[id] = { state, at:new Date().toISOString() };
     await Store.set('stump.marks', JSON.stringify(marks));
-    render(); return;
+    if (mode === 'map') map.closePopup();
+    refresh(); return;
   }
 
   const one = e.target.closest('[data-copy]');
