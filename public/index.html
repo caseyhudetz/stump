@@ -812,7 +812,7 @@ function renderDetail(){
         <div class="fact"><dt>From home</dt><dd>${miles(HOME,s).toFixed(2)} mi</dd></div>
       </dl>
       <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
-        <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></p>
+        <button class="linkish js-setname">${reporter ? 'change' : 'add your name'}</button></p>
     </details>
   `;
 
@@ -914,7 +914,7 @@ function repaint(){
          Open a site, look at the parkway strip, and say whether a tree is there.
          Your reports go to the shared list.<br>
          Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
-         <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></div>`
+         <button class="linkish js-setname">${reporter ? 'change' : 'add your name'}</button></div>`
     : '';
   $('#browse').hidden = !(tab === 'browse' && !detailId);
   $('#detail').hidden = !(tab === 'browse' && detailId);
@@ -1017,7 +1017,7 @@ document.addEventListener('click', async e => {
   const sh = e.target.closest('[data-share]');
   if (sh){ shareLink(sh.dataset.share === 'all' ? null : sh.dataset.share, sh); return; }
 
-  if (e.target.closest('#set-name')){
+  if (e.target.closest('.js-setname')){
     const name = prompt('Your name (so reports say who checked the site):', reporter || '');
     if (name !== null){
       reporter = name.trim().slice(0,40);
