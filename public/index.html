@@ -98,6 +98,28 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-size:clamp(2.6rem,13vw,4rem);line-height:.9;
   color:var(--ok);margin:0;text-transform:uppercase;letter-spacing:-.01em;
 }
+.offbig{
+  font-variation-settings:'wdth' 62,'wght' 800;
+  font-size:clamp(2rem,10vw,3rem);line-height:.95;
+  margin:0;text-transform:uppercase;letter-spacing:-.01em;
+}
+.bigbtn{
+  margin-top:1.15rem;padding:.95rem 1.5rem;
+  font-family:'Archivo',sans-serif;
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:.98rem;text-transform:uppercase;letter-spacing:.04em;
+  background:var(--ink);color:var(--paper);border:2px solid var(--ink);
+  cursor:pointer;border-radius:0;min-height:3.2rem;
+}
+.bigbtn:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
+.help{
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);
+  line-height:1.7;margin:.9rem auto 0;max-width:23rem;
+}
+.pickedtag{
+  font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.09em;margin:1.4rem 0 -.9rem;
+}
 .addr{
   font-variation-settings:'wdth' 78,'wght' 700;
   font-size:1.5rem;line-height:1.08;text-transform:uppercase;
@@ -311,7 +333,11 @@ const Store = {
     }catch(e){}
   }
 };
-let marks = {};   // sr_number -> { state:'none'|'tree'|'req', at:ISO }
+let marks = {};   // sr_number -> { state:'open'|'none'|'tree'|'req', at:ISO }
+
+async function saveMarks(){
+  await Store.set('stump.marks', JSON.stringify(marks));
+}
 
 /* ============================================================
    HELPERS
@@ -451,10 +477,12 @@ let SITES = [];
 let tab = 'walk', stab = 'none', shownSaved = PAGE;
 let skipped = new Set();
 let me = null, accuracy = null;
-let geo = 'idle';        // idle | locating | on | denied | unsupported
+let geo = 'idle';        // idle | locating | on | blocked | timeout | unavailable | unsupported
+let watchId = null;
 let heading = null;
 let compass = 'idle';    // idle | ask | on | denied | unsupported
 let override = false;    // user chose to mark from a distance
+let picked = null;       // site id chosen from the map, overrides "nearest"
 let map = null, layer = null;
 
 const stateOf = s => (marks[s.id] && marks[s.id].state) || 'open';
@@ -464,15 +492,26 @@ function queue(){
   return SITES.filter(s => stateOf(s) === 'open' && !skipped.has(s.id))
               .sort((a,b) => miles(from(),a) - miles(from(),b));
 }
-function target(){ return queue()[0] || null; }
+/* whatever the map picked, else the nearest unchecked site */
+function target(){
+  const q = queue();
+  if (picked){
+    const p = q.find(s => s.id === picked);
+    if (p) return p;
+    picked = null;              // it got marked or skipped; fall back to nearest
+  }
+  return q[0] || null;
+}
+const isPicked = () => { const t = target(); return !!(picked && t && t.id === picked && queue()[0] !== t); };
 
 /* ============================================================
    LOCATION + COMPASS
    ============================================================ */
 function startGeo(){
   if (!navigator.geolocation){ geo = 'unsupported'; renderWalk(); return; }
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   geo = 'locating'; renderWalk();
-  navigator.geolocation.watchPosition(
+  watchId = navigator.geolocation.watchPosition(
     pos => {
       me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       accuracy = pos.coords.accuracy;
@@ -480,9 +519,24 @@ function startGeo(){
       if (tab === 'walk') renderWalk();
       if (tab === 'map') renderMap();
     },
-    () => { me = null; geo = 'denied'; if (tab === 'walk') renderWalk(); },
-    { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+    err => {
+      me = null;
+      // 1 PERMISSION_DENIED · 2 POSITION_UNAVAILABLE · 3 TIMEOUT
+      geo = err.code === 1 ? 'blocked' : err.code === 3 ? 'timeout' : 'unavailable';
+      if (tab === 'walk') renderWalk();
+    },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:20000 }
   );
+}
+
+/* if the browser already knows the answer, reflect it before any prompt */
+async function primeGeo(){
+  try{
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    const st = await navigator.permissions.query({ name:'geolocation' });
+    if (st.state === 'denied'){ geo = 'blocked'; renderWalk(); }
+    st.onchange = () => { if (st.state === 'granted') startGeo(); };
+  }catch(e){ /* Safari < 16 has no geolocation permission query */ }
 }
 
 function onOrient(e){
@@ -576,8 +630,23 @@ function renderWalk(){
   // distance readout
   let readout;
   if (!known){
-    readout = `<p class="distnum">?</p>
-      <p class="distunit">${geo === 'locating' ? 'finding you…' : 'distance unknown'}</p>`;
+    const headline = {
+      locating:   ['Finding you…',   'hold tight'],
+      blocked:    ['Location off',   'blocked in this browser'],
+      timeout:    ['No fix yet',     'signal is weak'],
+      unavailable:['No fix yet',     'location unavailable'],
+      unsupported:['No location',    'not supported here'],
+      idle:       ['Location off',   'not turned on']
+    }[geo] || ['Location off','not turned on'];
+    readout = `
+      <p class="offbig">${geo === 'locating' ? '<span class="spin">◍</span> ' : ''}${headline[0]}</p>
+      <p class="distunit">${headline[1]}</p>
+      ${geo !== 'locating' && geo !== 'unsupported'
+        ? `<button class="bigbtn" id="enable-geo">Turn on location</button>` : ''}
+      ${geo === 'blocked'
+        ? `<p class="help">Your browser is refusing it. Tap the <b>lock</b> or <b>ⓘ</b> icon
+             next to the address bar → Location → Allow, then reload.
+             On iOS also check Settings → Privacy → Location Services → Safari.</p>` : ''}`;
   } else if (arrived){
     readout = `<p class="arrivedbig">You're here</p>
       <p class="distunit">within ${Math.round(ft)} ft</p>`;
@@ -594,17 +663,15 @@ function renderWalk(){
 
   // hint line under the address
   let hint = '';
-  if (geo === 'denied')
-    hint = `<span class="warn">Location is off.</span> <button class="linkish" id="retry-geo">Turn it on</button>`;
-  else if (geo === 'unsupported')
-    hint = `This browser can't do location — mark by eye.`;
+  if (!known)
+    hint = `Sorted from ${HOME.label} — mark by eye until location works.`;
   else if (arrived)
     hint = `<b>Look at the parkway strip.</b>`;
-  else if (known && compass === 'ask')
+  else if (compass === 'ask')
     hint = `<button class="linkish" id="ask-compass">Turn on compass</button> to see which way to walk`;
-  else if (known && !canMark)
+  else if (!canMark)
     hint = `Get within ${ARRIVE_FT} ft to check in · <button class="linkish" id="override">Mark from here</button>`;
-  else if (known && override)
+  else if (override)
     hint = `Marking from ${Math.round(ft)} ft away`;
 
   if (known && accuracy && accuracy > 40 && !arrived)
@@ -613,6 +680,8 @@ function renderWalk(){
   el.innerHTML = `
     ${dial}
     ${readout}
+    ${isPicked() ? `<p class="pickedtag">Picked from map ·
+       <button class="linkish" id="unpick">back to nearest</button></p>` : ''}
     <h2 class="addr">${t.address}</h2>
     <p class="sub">Removal closed ${ago(t.closed)} · ${longDate(t.closed)}</p>
     <p class="hint">${hint}</p>
@@ -666,12 +735,13 @@ function renderMap(){
 
   list.forEach(s => {
     const isNext = next && s.id === next.id;
-    L.circleMarker([s.lat, s.lng], {
+    const m = L.circleMarker([s.lat, s.lng], {
       radius: isNext ? 10 : 7, weight:2, color:'#fff',
       fillColor: isNext ? '#E2330A' : '#0B0B0C', fillOpacity:1
-    }).addTo(layer).bindPopup(
-      `<b>${s.address}</b><span class="pm">${Math.round(feet(from(), s))} ft away · closed ${ago(s.closed)}</span>`
-    );
+    }).addTo(layer);
+    // tapping a pin takes you straight to that site's card, ready to mark
+    m.on('click', () => { picked = s.id; override = false; tab = 'walk'; applyTab(); });
+    m.bindTooltip(s.address, { direction:'top', offset:[0,-6] });
     pts.push([s.lat, s.lng]);
   });
 
@@ -765,28 +835,30 @@ document.addEventListener('click', async e => {
   if (act && !act.disabled){
     const id = act.dataset.id;
     marks[id] = { state: act.id === 'btn-none' ? 'none' : 'tree', at: new Date().toISOString() };
-    override = false;
-    await Store.set('stump.marks', JSON.stringify(marks));
+    picked = null; override = false;
+    await saveMarks();
     renderWalk();
     return;
   }
 
   if (e.target.closest('#skip')){
     const t = target(); if (t) skipped.add(t.id);
-    override = false; renderWalk(); return;
+    picked = null; override = false; renderWalk(); return;
   }
   if (e.target.closest('#unskip')){ skipped.clear(); renderWalk(); return; }
+  if (e.target.closest('#unpick')){ picked = null; renderWalk(); return; }
   if (e.target.closest('#override')){ override = true; renderWalk(); return; }
-  if (e.target.closest('#retry-geo')){ startGeo(); return; }
+  if (e.target.closest('#enable-geo')){ startGeo(); return; }
   if (e.target.closest('#ask-compass')){ startCompass(); return; }
   if (e.target.closest('#moresaved')){ shownSaved += PAGE; renderSaved(); return; }
 
   const mk = e.target.closest('[data-mark]');
   if (mk){
     const [id, st] = mk.dataset.mark.split('::');
-    if (st === 'open') delete marks[id]; else marks[id] = { state:st, at:new Date().toISOString() };
+    if (st === 'open') marks[id] = { state:'open', at:new Date().toISOString() };
+    else marks[id] = { state:st, at:new Date().toISOString() };
     skipped.delete(id);
-    await Store.set('stump.marks', JSON.stringify(marks));
+    await saveMarks();
     renderSaved(); renderWalk(); return;
   }
 
@@ -826,6 +898,7 @@ function fallbackCopy(text, done){
    ============================================================ */
 (async function init(){
   renderWalk();
+  primeGeo();
   startGeo();
   initCompass();
 
