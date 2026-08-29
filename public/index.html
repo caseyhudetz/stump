@@ -647,6 +647,12 @@ let SITES = [];
 let tab = 'browse', view = 'list', sort = 'street', todoOnly = false;
 let query = '', detailId = null;
 let map = null, layer = null, mini = null;
+let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
+
+/* Leaflet has to let go of its container before innerHTML replaces it. */
+function killMini(){
+  if (mini){ try{ mini.remove(); }catch(e){} mini = null; }
+}
 let lastUndo = null;     // {id, address, prev} so an undo can be taken back
 let reporter = '';       // optional name, so shared reports say who checked
 let guest = false;       // arrived through someone else's share link
@@ -771,6 +777,8 @@ function renderDetail(){
         <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
       </div>`;
 
+  killMini();   // before the container it lives in is thrown away
+
   el.innerHTML = `
     <button class="back" id="back">‹ All sites</button>
     <h2 class="daddr">${esc(s.address)}</h2>
@@ -794,7 +802,7 @@ function renderDetail(){
     ${banner}
     <div id="minimap"></div>
 
-    <details class="more">
+    <details class="more"${detailsOpen ? ' open' : ''}>
       <summary>Details</summary>
       <dl class="facts">
         <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)}</dd></div>
@@ -814,7 +822,6 @@ function renderDetail(){
 
   // small map so you can confirm you're looking at the right pit
   if (typeof L !== 'undefined'){
-    if (mini){ mini.remove(); mini = null; }
     mini = L.map('minimap', { attributionControl:false, zoomControl:false, dragging:false,
       scrollWheelZoom:false, doubleClickZoom:false, touchZoom:false });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(mini);
@@ -912,7 +919,7 @@ function repaint(){
   $('#browse').hidden = !(tab === 'browse' && !detailId);
   $('#detail').hidden = !(tab === 'browse' && detailId);
   $('#tasks').hidden  = tab !== 'tasks';
-  if (!(tab === 'browse' && detailId)) $('#dock').hidden = true;
+  if (!(tab === 'browse' && detailId)){ $('#dock').hidden = true; killMini(); }
 
   const n = tasks().length;
   $('#taskdot').hidden = !n;
@@ -1028,6 +1035,11 @@ document.addEventListener('click', async e => {
   const all = e.target.closest('[data-copyall]');
   if (all){ copy(packetText(byId(all.dataset.copyall)), all); return; }
 });
+
+/* remember whether Details was open, so a re-render restores it */
+document.addEventListener('toggle', e => {
+  if (e.target.classList && e.target.classList.contains('more')) detailsOpen = e.target.open;
+}, true);
 
 let qt;
 document.addEventListener('input', e => {
