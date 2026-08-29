@@ -34,7 +34,9 @@ body{
 }
 
 /* ---------- shell ---------- */
-.app{min-height:100dvh;display:flex;flex-direction:column;max-width:620px;margin:0 auto}
+/* Fixed to the viewport, not merely at least as tall as it: the sections
+   scroll inside, so the action bar can hold the bottom of the screen. */
+.app{height:100dvh;display:flex;flex-direction:column;max-width:620px;margin:0 auto;overflow:hidden}
 .topbar{padding:calc(env(safe-area-inset-top) + .9rem) 1.1rem .7rem;border-bottom:1px solid var(--line)}
 .brandrow{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .mark{
@@ -82,7 +84,8 @@ body{
 .share .mini{width:100%}
 
 main{flex:1;display:flex;flex-direction:column;min-height:0}
-.scroller{flex:1;overflow-y:auto;padding:1rem 1.1rem 2.5rem;-webkit-overflow-scrolling:touch}
+.scroller{flex:1;min-height:0;overflow-y:auto;padding:1rem 1.1rem 2.5rem;-webkit-overflow-scrolling:touch}
+.topbar{flex:0 0 auto}
 
 /* ---------- browse controls ---------- */
 .controls{display:flex;gap:.4rem;align-items:stretch;margin-bottom:.6rem}
@@ -168,6 +171,46 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-size:clamp(1.9rem,9vw,2.6rem);line-height:1.02;
   text-transform:uppercase;margin:0 0 .8rem;overflow-wrap:break-word;
 }
+/* getting there and asking for help are navigation, not decisions —
+   no box, no fill, so they never compete with the two answers */
+.quiet{display:flex;gap:1.4rem;align-items:center;flex-wrap:wrap;
+  margin:0 0 1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--line)}
+.qact{
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:none;border:0;padding:.35rem 0;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;
+  text-transform:uppercase;letter-spacing:.08em;
+  color:var(--dim);text-decoration:none;
+}
+.qact svg{width:1.05rem;height:1.05rem;flex:0 0 auto}
+.qact:hover,.qact:focus-visible{color:var(--ink)}
+.qact:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+
+/* everything you rarely need, one tap away */
+.more{border-top:1px solid var(--line);margin-top:1.2rem}
+.more summary{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+  padding:.85rem 0;cursor:pointer;list-style:none;
+}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{
+  content:'›';display:inline-block;margin-right:.5rem;
+  transition:transform .15s ease;transform-origin:50% 50%;
+}
+.more[open] summary::before{transform:rotate(90deg)}
+.more summary:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+
+/* the answer stays under the thumb no matter how far you scroll */
+.dock{
+  flex:0 0 auto;                 /* sits below the scrolling card, always visible */
+  background:var(--paper);border-top:1px solid var(--line);
+  padding:.7rem 1.1rem calc(.7rem + env(safe-area-inset-bottom));
+  box-shadow:0 -6px 16px rgba(0,0,0,.06);
+}
+.dock .ask{margin:0 0 .5rem}
+.dock .btnrow{margin-top:0}
+
 .facts{border-top:1px solid var(--line);margin-bottom:1rem}
 .fact{display:flex;justify-content:space-between;gap:1rem;
   border-bottom:1px solid var(--line);padding:.6rem 0}
@@ -184,7 +227,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .state.req{background:#EDF6F0;border-left:4px solid var(--ok)}
 .state.tree{background:var(--wash);border-left:4px solid var(--line)}
 .ask{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
-  text-transform:uppercase;letter-spacing:.09em;margin:0 0 .6rem}
+  text-transform:uppercase;letter-spacing:.09em;margin:0 0 .6rem;text-align:center}
 .choices{display:flex;gap:.6rem}
 .act{
   flex:1;min-height:4.4rem;
@@ -337,6 +380,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     </section>
 
     <section id="detail" class="scroller" hidden></section>
+    <div class="dock" id="dock" hidden></div>
 
     <section id="tasks" class="scroller" hidden>
       <button class="back" id="backsites">‹ All sites</button>
@@ -706,7 +750,7 @@ function renderDetail(){
     : '';
 
   const choices = st === 'open' ? `
-      <p class="ask">Standing here — is there a tree in the parkway?</p>
+      <p class="ask">Is there a tree in the parkway?</p>
       <div class="choices">
         <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
         <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
@@ -720,26 +764,43 @@ function renderDetail(){
   el.innerHTML = `
     <button class="back" id="back">‹ All sites</button>
     <h2 class="daddr">${esc(s.address)}</h2>
+
+    <div class="quiet">
+      <a class="qact" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>Directions</a>
+      <button class="qact" data-share="${esc(s.id)}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"
+                fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>Ask someone</button>
+    </div>
+
     ${banner}
     <div id="minimap"></div>
-    <dl class="facts">
-      <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)}</dd></div>
-      <div class="fact"><dt>That was</dt><dd>${ago(s.closed)}</dd></div>
-      <div class="fact"><dt>City request</dt><dd>${esc(s.id)}</dd></div>
-      <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
-      <div class="fact"><dt>From home</dt><dd>${miles(HOME,s).toFixed(2)} mi</dd></div>
-    </dl>
-    <div class="btnrow">
-      <a class="mini ghost" target="_blank" rel="noopener"
-         href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Directions</a>
-      <a class="mini ghost" target="_blank" rel="noopener"
-         href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${s.lat},${s.lng}">Street view</a>
-      <button class="mini ghost" data-share="${esc(s.id)}">Ask someone to check</button>
-    </div>
-    <div style="margin-top:1.3rem">${choices}</div>
-    <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
-      <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></p>
+
+    <details class="more">
+      <summary>Details</summary>
+      <dl class="facts">
+        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)}</dd></div>
+        <div class="fact"><dt>That was</dt><dd>${ago(s.closed)}</dd></div>
+        <div class="fact"><dt>City request</dt><dd>${esc(s.id)}</dd></div>
+        <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
+        <div class="fact"><dt>From home</dt><dd>${miles(HOME,s).toFixed(2)} mi</dd></div>
+      </dl>
+      <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
+        <button class="linkish" id="set-name">${reporter ? 'change' : 'add your name'}</button></p>
+    </details>
   `;
+
+  // the decision rides at the bottom of the screen, under your thumb
+  $('#dock').innerHTML = choices;
+  $('#dock').hidden = false;
 
   // small map so you can confirm you're looking at the right pit
   if (typeof L !== 'undefined'){
@@ -832,6 +893,7 @@ function repaint(){
   $('#browse').hidden = !(tab === 'browse' && !detailId);
   $('#detail').hidden = !(tab === 'browse' && detailId);
   $('#tasks').hidden  = tab !== 'tasks';
+  if (!(tab === 'browse' && detailId)) $('#dock').hidden = true;
 
   const n = tasks().length;
   $('#taskdot').hidden = !n;
