@@ -27,227 +27,181 @@
 [hidden]{display:none!important}
 html,body{margin:0;padding:0;height:100%}
 body{
-  background:var(--paper);
-  color:var(--ink);
+  background:var(--paper);color:var(--ink);
   font-family:'Archivo',system-ui,sans-serif;
   font-size:16px;line-height:1.4;
   -webkit-font-smoothing:antialiased;
-  overscroll-behavior-y:contain;
 }
-.mono{font-family:'IBM Plex Mono',monospace}
 
 /* ---------- shell ---------- */
-.app{
-  min-height:100dvh;display:flex;flex-direction:column;
-  max-width:560px;margin:0 auto;
-}
-.topbar{
-  padding:calc(env(safe-area-inset-top) + .9rem) 1.1rem .7rem;
-  border-bottom:1px solid var(--line);
-}
+.app{min-height:100dvh;display:flex;flex-direction:column;max-width:620px;margin:0 auto}
+.topbar{padding:calc(env(safe-area-inset-top) + .9rem) 1.1rem .7rem;border-bottom:1px solid var(--line)}
 .brandrow{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .mark{
   font-variation-settings:'wdth' 62,'wght' 800;
-  font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase;
-  line-height:1;margin:0;
-}
-.left{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--dim);
+  font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase;line-height:1;margin:0;
 }
 .statuses{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem}
-.sync{
-  font-family:'IBM Plex Mono',monospace;font-size:.58rem;
-  text-transform:uppercase;letter-spacing:.08em;color:var(--dim);opacity:.75;
-}
+.left{font-family:'IBM Plex Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+.sync{font-family:'IBM Plex Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);opacity:.75}
 .sync.warn{color:var(--hot);opacity:1}
 .tabs{display:flex;gap:.35rem;margin-top:.75rem}
 .tab{
   font-family:'IBM Plex Mono',monospace;font-size:.66rem;
   text-transform:uppercase;letter-spacing:.09em;
-  padding:.42rem .7rem;border:1px solid var(--line);
+  padding:.45rem .75rem;border:1px solid var(--line);
   background:transparent;color:var(--dim);cursor:pointer;border-radius:0;
 }
 .tab[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .tab:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.tab .badge{
+  display:inline-block;margin-left:.35rem;padding:0 .3rem;
+  background:var(--hot);color:#fff;border-radius:2px;font-size:.6rem;
+}
+.tab[aria-pressed="true"] .badge{background:var(--paper);color:var(--ink)}
 
 main{flex:1;display:flex;flex-direction:column;min-height:0}
+.scroller{flex:1;overflow-y:auto;padding:1rem 1.1rem 2.5rem;-webkit-overflow-scrolling:touch}
 
-/* ---------- walk screen ---------- */
-#walk{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  text-align:center;padding:1rem 1.1rem 0;gap:.15rem;
-}
-.dial{
-  width:104px;height:104px;display:flex;align-items:center;justify-content:center;
-  color:var(--ink);margin-bottom:.5rem;
-}
-.dial svg{width:100%;height:100%;display:block}
-#arrowRot{transition:transform .25s cubic-bezier(.2,.7,.3,1);transform-origin:50% 50%}
-.dial.arrived{color:var(--ok)}
-
-.distnum{
-  font-variation-settings:'wdth' 62,'wght' 800;
-  font-feature-settings:'tnum' 1;
-  font-size:clamp(4.6rem,26vw,7.5rem);
-  line-height:.82;letter-spacing:-.025em;
-  margin:0;
-}
-.distunit{
-  font-family:'IBM Plex Mono',monospace;
-  font-size:.74rem;text-transform:uppercase;letter-spacing:.18em;
-  color:var(--dim);margin:.55rem 0 0;
-}
-.arrivedbig{
-  font-variation-settings:'wdth' 62,'wght' 800;
-  font-size:clamp(2.6rem,13vw,4rem);line-height:.9;
-  color:var(--ok);margin:0;text-transform:uppercase;letter-spacing:-.01em;
-}
-/* location trouble is a banner, not the headline — the address and the two
-   buttons still have to be the thing you can act on */
-.banner{
-  display:flex;align-items:center;justify-content:center;gap:.6rem;
-  flex-wrap:wrap;width:100%;
-  border:1px solid var(--line);background:var(--wash);
-  padding:.6rem .75rem;margin-bottom:1.4rem;
-}
-.banner.bad{border-color:var(--hot);background:#FDF0EC}
-.bmsg{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
-  text-transform:uppercase;letter-spacing:.06em;color:var(--ink);
-}
-.banner.bad .bmsg{color:var(--hot)}
-.bbtn{
-  font-family:'Archivo',sans-serif;
-  font-variation-settings:'wdth' 84,'wght' 700;
-  font-size:.76rem;text-transform:uppercase;letter-spacing:.04em;
-  background:var(--ink);color:var(--paper);border:1px solid var(--ink);
-  padding:.42rem .7rem;cursor:pointer;border-radius:0;min-height:2.1rem;
-}
-.bbtn:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
-.bhelp{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim)}
-.help{
-  font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--ink);
-  line-height:1.75;margin:0 auto 1.4rem;max-width:24rem;text-align:left;
-  border-left:2px solid var(--hot);padding:.2rem 0 .2rem .8rem;
-}
-.help ol{margin:.5rem 0 0;padding-left:1.1rem}
-.help li{margin-bottom:.5rem}
-.diag{
-  font-size:.58rem;color:var(--dim);margin:.7rem 0 0;
-  word-break:break-word;opacity:.8;
-}
-.bigbtn{
-  margin:0 auto .5rem;padding:.9rem 1.4rem;display:block;
-  font-family:'Archivo',sans-serif;
-  font-variation-settings:'wdth' 78,'wght' 700;
-  font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;
-  background:var(--ink);color:var(--paper);border:2px solid var(--ink);
-  cursor:pointer;border-radius:0;min-height:3.1rem;
-}
-.bigbtn:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
-.maptip{
-  background:var(--ink);color:var(--paper);
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
-  padding:.6rem .75rem;margin-bottom:.6rem;text-align:center;
-}
-.maptip .linkish{color:var(--paper)}
-.maprow{display:flex;gap:.5rem;margin-top:.8rem}
-#map.arming{cursor:crosshair;outline:3px solid var(--hot);outline-offset:-3px}
-/* with no distance to show, the address carries the screen */
-#walk.nofix .addr{font-size:clamp(1.8rem,9vw,2.5rem);margin-top:0}
-.pickedtag{
-  font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
-  text-transform:uppercase;letter-spacing:.09em;margin:1.4rem 0 -.9rem;
-}
-.addr{
-  font-variation-settings:'wdth' 78,'wght' 700;
-  font-size:1.5rem;line-height:1.08;text-transform:uppercase;
-  margin:1.5rem 0 0;overflow-wrap:break-word;
-}
-.sub{
-  font-family:'IBM Plex Mono',monospace;font-size:.7rem;
-  color:var(--dim);margin:.5rem 0 0;line-height:1.6;
-}
-.hint{
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
-  color:var(--dim);margin:1.15rem 0 .3rem;line-height:1.6;
-  min-height:1.2rem;
-}
-.hint b{color:var(--ok);font-weight:600}
-.hint .warn{color:var(--hot)}
-.linkish{
-  font:inherit;color:var(--ink);background:none;border:none;padding:0;
-  cursor:pointer;text-decoration:underline;text-underline-offset:3px;
-}
-.walkto{
-  display:inline-block;margin-top:.9rem;
-  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+/* ---------- browse controls ---------- */
+.controls{display:flex;gap:.4rem;align-items:center;margin-bottom:.85rem;flex-wrap:wrap}
+.seg{display:flex;gap:0;border:1px solid var(--ink)}
+.seg button{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
   text-transform:uppercase;letter-spacing:.09em;
-  color:var(--dim);text-decoration:none;
-  border-bottom:1px solid var(--line);padding-bottom:2px;
+  padding:.5rem .9rem;border:0;background:transparent;color:var(--ink);cursor:pointer;
 }
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.search{
+  flex:1;min-width:9rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.82rem;
+  padding:.6rem .7rem;border:1px solid var(--line);background:var(--paper);
+  color:var(--ink);border-radius:0;min-height:2.7rem;
+}
+.search:focus{outline:2px solid var(--ink);outline-offset:-2px}
+.sorts{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.9rem}
+.chip{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
+  text-transform:uppercase;letter-spacing:.08em;
+  padding:.35rem .6rem;border:1px solid var(--line);
+  background:transparent;color:var(--dim);cursor:pointer;border-radius:0;
+}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.count{font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;margin:0 0 .6rem}
 
-/* ---------- action dock ---------- */
-.dock{
-  display:flex;gap:.6rem;padding:.75rem 1.1rem calc(.75rem + env(safe-area-inset-bottom));
-  border-top:1px solid var(--line);background:var(--paper);
+/* ---------- list ---------- */
+.row{
+  display:flex;align-items:center;gap:.8rem;width:100%;text-align:left;
+  border:0;border-bottom:1px solid var(--line);background:transparent;
+  padding:.9rem .2rem;cursor:pointer;color:var(--ink);
 }
-.act{
-  flex:1;min-height:4.2rem;
-  font-family:'Archivo',sans-serif;
-  font-variation-settings:'wdth' 74,'wght' 700;
-  font-size:1.02rem;line-height:1.1;text-transform:uppercase;letter-spacing:.02em;
-  border:2px solid var(--ink);background:var(--paper);color:var(--ink);
-  cursor:pointer;border-radius:0;
-  display:flex;align-items:center;justify-content:center;text-align:center;
-  transition:opacity .18s ease,min-height .18s ease;
+.row:first-child{border-top:1px solid var(--line)}
+.row:active{background:var(--wash)}
+.rmain{flex:1;min-width:0}
+.raddr{
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:1.15rem;line-height:1.15;text-transform:uppercase;
+  margin:0 0 .2rem;overflow-wrap:break-word;
 }
-.act.no{background:var(--hot);border-color:var(--hot);color:#fff}
-.act:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
-.act:disabled{opacity:.28;cursor:default;min-height:3.2rem}
-.dock.far .act{min-height:3.2rem}
+.rmeta{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim)}
+.pill{
+  font-family:'IBM Plex Mono',monospace;font-size:.56rem;
+  text-transform:uppercase;letter-spacing:.08em;
+  padding:.22rem .4rem;border:1px solid var(--line);color:var(--dim);flex:0 0 auto;
+}
+.pill.none{background:var(--hot);border-color:var(--hot);color:#fff}
+.pill.req{background:var(--ok);border-color:var(--ok);color:#fff}
+.pill.tree{background:var(--wash)}
+.chev{color:var(--dim);flex:0 0 auto;font-size:1.1rem}
 
-/* ---------- generic screens ---------- */
-.scroller{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 2.5rem}
-#map{height:62vh;min-height:300px;width:100%;border:1px solid var(--line);background:var(--wash)}
+/* ---------- map ---------- */
+#map{height:66vh;min-height:340px;width:100%;border:1px solid var(--line);background:var(--wash)}
 .legend{
   display:flex;gap:1rem;flex-wrap:wrap;padding:.7rem 0 0;
-  font-family:'IBM Plex Mono',monospace;font-size:.63rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
   text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
 }
 .legend span{display:inline-flex;align-items:center;gap:.35rem}
-.legend i{width:.62rem;height:.62rem;border-radius:50%;display:inline-block}
+.legend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
-.leaflet-popup-content{font-family:'Archivo',sans-serif;margin:.7rem .8rem;min-width:150px}
-.leaflet-popup-content b{
-  display:block;font-variation-settings:'wdth' 78,'wght' 700;
-  text-transform:uppercase;font-size:.98rem;margin-bottom:.15rem;
+.leaflet-popup-content{font-family:'Archivo',sans-serif;margin:.7rem .8rem;min-width:160px}
+.leaflet-popup-content b{display:block;font-variation-settings:'wdth' 78,'wght' 700;
+  text-transform:uppercase;font-size:.95rem;margin-bottom:.15rem}
+.leaflet-popup-content .pm{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim)}
+.popbtn{
+  margin-top:.5rem;width:100%;padding:.5rem;border:1px solid var(--ink);
+  background:var(--ink);color:var(--paper);cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
+  text-transform:uppercase;letter-spacing:.08em;
 }
-.leaflet-popup-content .pm{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim)}
 
-/* ---------- saved ---------- */
-.card{border:1px solid var(--line);border-left:4px solid var(--line);padding:.9rem .95rem;margin-bottom:.8rem}
-.card.k-none{border-left-color:var(--hot)}
-.card.k-req{border-left-color:var(--ok)}
-.card.k-tree{border-left-color:var(--line);color:var(--dim)}
-.card h3{
-  font-variation-settings:'wdth' 78,'wght' 700;
-  font-size:1.16rem;line-height:1.1;text-transform:uppercase;margin:0 0 .35rem;
+/* ---------- detail ---------- */
+.back{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+  background:none;border:0;padding:.2rem 0;cursor:pointer;margin-bottom:1rem;
 }
-.card .cm{font-family:'IBM Plex Mono',monospace;font-size:.67rem;color:var(--dim);line-height:1.6}
-.row{display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap}
+.daddr{
+  font-variation-settings:'wdth' 72,'wght' 800;
+  font-size:clamp(1.9rem,9vw,2.6rem);line-height:1.02;
+  text-transform:uppercase;margin:0 0 .8rem;overflow-wrap:break-word;
+}
+.facts{border-top:1px solid var(--line);margin-bottom:1rem}
+.fact{display:flex;justify-content:space-between;gap:1rem;
+  border-bottom:1px solid var(--line);padding:.6rem 0}
+.fact dt{font-family:'IBM Plex Mono',monospace;font-size:.62rem;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);margin:0}
+.fact dd{margin:0;font-size:.92rem;text-align:right;
+  font-variation-settings:'wdth' 92,'wght' 600}
+#minimap{height:190px;width:100%;border:1px solid var(--line);background:var(--wash);margin-bottom:1rem}
+.state{
+  padding:.8rem .9rem;margin-bottom:1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
+}
+.state.none{background:#FDF0EC;border-left:4px solid var(--hot)}
+.state.req{background:#EDF6F0;border-left:4px solid var(--ok)}
+.state.tree{background:var(--wash);border-left:4px solid var(--line)}
+.ask{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.09em;margin:0 0 .6rem}
+.choices{display:flex;gap:.6rem}
+.act{
+  flex:1;min-height:4.4rem;
+  font-family:'Archivo',sans-serif;
+  font-variation-settings:'wdth' 74,'wght' 700;
+  font-size:1rem;line-height:1.1;text-transform:uppercase;letter-spacing:.02em;
+  border:2px solid var(--ink);background:var(--paper);color:var(--ink);
+  cursor:pointer;border-radius:0;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+}
+.act.no{background:var(--hot);border-color:var(--hot);color:#fff}
+.act:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+
+/* ---------- buttons ---------- */
+.btnrow{display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap}
 .mini{
-  flex:1;min-height:2.9rem;min-width:8rem;
+  flex:1;min-height:3rem;min-width:8rem;
   font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 84,'wght' 650;
-  font-size:.83rem;border:1px solid var(--ink);background:transparent;color:var(--ink);
+  font-size:.85rem;border:1px solid var(--ink);background:transparent;color:var(--ink);
   cursor:pointer;text-decoration:none;border-radius:0;
   display:inline-flex;align-items:center;justify-content:center;text-align:center;padding:.5rem .6rem;
 }
 .mini.fill{background:var(--ink);color:var(--paper)}
 .mini.hot{background:var(--hot);border-color:var(--hot);color:#fff}
 .mini.ghost{border-color:var(--line);color:var(--dim)}
+
+/* ---------- tasks ---------- */
+.task{border:1px solid var(--line);border-left:4px solid var(--hot);padding:.95rem;margin-bottom:.9rem}
+.task.done{border-left-color:var(--ok);opacity:.72}
+.task h3{
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:1.2rem;line-height:1.1;text-transform:uppercase;margin:0 0 .3rem;
+}
+.task .tm{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);line-height:1.6}
+.steps{
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);
+  margin:.8rem 0 0;padding-left:1.1rem;line-height:1.8;
+}
 .packet{margin-top:.9rem;border-top:1px solid var(--line);padding-top:.8rem}
 .packet h4{
   font-family:'IBM Plex Mono',monospace;font-size:.6rem;font-weight:600;
@@ -255,38 +209,29 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 .field{border-bottom:1px dotted var(--line);padding:.5rem 0}
 .field:last-of-type{border-bottom:0}
-.flabel{
-  font-family:'IBM Plex Mono',monospace;font-size:.58rem;
-  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
-  display:block;margin-bottom:.22rem;
-}
+.flabel{font-family:'IBM Plex Mono',monospace;font-size:.58rem;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--dim);display:block;margin-bottom:.22rem}
 .fval{display:flex;gap:.5rem;align-items:flex-start}
 .fval p{margin:0;flex:1;font-size:.88rem;line-height:1.42}
 .copy{
   font-family:'IBM Plex Mono',monospace;font-size:.56rem;
   text-transform:uppercase;letter-spacing:.07em;
   border:1px solid var(--line);background:transparent;color:var(--dim);
-  padding:.3rem .45rem;cursor:pointer;flex:0 0 auto;
+  padding:.32rem .48rem;cursor:pointer;flex:0 0 auto;
 }
 .copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
 
 /* ---------- states ---------- */
-.msg{
-  font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--dim);
-  text-align:center;line-height:1.75;padding:2.5rem 1rem;
-}
-.msg b{display:block;font-family:'Archivo',sans-serif;font-size:1.15rem;color:var(--ink);margin-bottom:.5rem;
-  font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase}
+.msg{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--dim);
+  text-align:center;line-height:1.75;padding:2.5rem 1rem}
+.msg b{display:block;font-family:'Archivo',sans-serif;font-size:1.15rem;color:var(--ink);
+  margin-bottom:.5rem;font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase}
 .msg.bad b{color:var(--hot)}
 .spin{display:inline-block;animation:sp 1.3s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.note{
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
-  line-height:1.75;border-top:1px solid var(--line);margin-top:1.5rem;padding-top:1rem;
-}
-@media (prefers-reduced-motion:reduce){
-  *{animation-duration:.001ms!important;transition-duration:.001ms!important}
-}
+.note{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
+  line-height:1.75;border-top:1px solid var(--line);margin-top:1.6rem;padding-top:1rem}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 </style>
 </head>
 <body>
@@ -301,49 +246,52 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       </span>
     </div>
     <div class="tabs" id="tabs" hidden>
-      <button class="tab" data-tab="walk" aria-pressed="true">Walk</button>
-      <button class="tab" data-tab="map" aria-pressed="false">Map</button>
-      <button class="tab" data-tab="saved" aria-pressed="false">Saved</button>
+      <button class="tab" data-tab="browse" aria-pressed="true">Sites</button>
+      <button class="tab" data-tab="tasks" aria-pressed="false">Tasks<span class="badge" id="taskbadge" hidden>0</span></button>
     </div>
   </div>
 
   <main>
-    <section id="walk"></section>
-
-    <section id="mapscreen" class="scroller" hidden>
-      <div id="maptip" class="maptip" hidden></div>
-      <div id="map"></div>
-      <div class="legend">
-        <span><i style="background:#0B0B0C"></i>To check</span>
-        <span><i style="background:#E2330A"></i>Next up</span>
-        <span><i style="background:#0E6FD8"></i>You</span>
+    <section id="browse" class="scroller">
+      <div class="controls">
+        <div class="seg">
+          <button data-view="list" aria-pressed="true">List</button>
+          <button data-view="map" aria-pressed="false">Map</button>
+        </div>
+        <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
       </div>
-      <div class="maprow">
-        <button class="mini" id="setpos-btn">Set my position</button>
+      <div class="sorts" id="sorts">
+        <button class="chip" data-sort="street" aria-pressed="true">Street A–Z</button>
+        <button class="chip" data-sort="near" aria-pressed="false">Nearest home</button>
+        <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
+        <button class="chip" data-sort="todo" aria-pressed="false">Unchecked only</button>
+      </div>
+      <p class="count" id="count"></p>
+      <div id="list"></div>
+      <div id="mapwrap" hidden>
+        <div id="map"></div>
+        <div class="legend">
+          <span><i style="background:#0B0B0C"></i>Unchecked</span>
+          <span><i style="background:#E2330A"></i>No tree</span>
+          <span><i style="background:#0B7A38"></i>Filed</span>
+          <span><i style="background:#B8B6AE"></i>Has tree</span>
+        </div>
       </div>
     </section>
 
-    <section id="savedscreen" class="scroller" hidden>
-      <div class="tabs" id="savedtabs">
-        <button class="tab" data-stab="none" aria-pressed="true">To file</button>
-        <button class="tab" data-stab="req" aria-pressed="false">Filed</button>
-        <button class="tab" data-stab="tree" aria-pressed="false">Has tree</button>
-      </div>
-      <div id="savedlist" style="margin-top:1rem"></div>
+    <section id="detail" class="scroller" hidden></section>
+
+    <section id="tasks" class="scroller" hidden>
+      <div id="tasklist"></div>
       <p class="note">
         Data: Chicago 311 service requests, queried live from the city open data portal.
         A site appears when a Tree Removal Inspection closed as Completed in the last six
         months and no Tree Planting Request has been filed at that address since.<br>
-        <span id="storagenote">Your marks are stored on this device.</span><br>
+        <span id="storagenote">Your reports are stored on this device.</span><br>
         <span id="stamp"></span>
       </p>
     </section>
   </main>
-
-  <div class="dock" id="dock" hidden>
-    <button class="act yes" id="btn-tree">Tree<br>is here</button>
-    <button class="act no" id="btn-none">No<br>tree</button>
-  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -355,8 +303,7 @@ const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
-const ARRIVE_FT = 60;          // within this many feet counts as "you're here"
-const PAGE = 8;
+const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7g9EAC';
 
 const REMOVALS_SINCE = (() => {
   const d = new Date();
@@ -365,7 +312,7 @@ const REMOVALS_SINCE = (() => {
 })();
 
 /* ============================================================
-   STORAGE
+   STORAGE + SYNC
    ============================================================ */
 const Store = {
   async get(k){
@@ -381,18 +328,12 @@ const Store = {
     }catch(e){}
   }
 };
-let marks = {};   // sr_number -> { state:'open'|'none'|'tree'|'req', at:ISO }
+let marks = {};   // sr_number -> { state:'open'|'tree'|'none'|'req', at:ISO }
 
-/* ============================================================
-   SYNC  — marks live in KV behind /api/marks so a check-in on the
-   phone shows up on the desktop later. Falls back to device-only
-   storage whenever the API isn't reachable or isn't configured.
-   ============================================================ */
 const SYNC_URL = '/api/marks';
-let sync = 'idle';        // idle | on | off | saving | offline
-let dirty = false;        // local edits not yet accepted by the server
+let sync = 'idle';   // idle | on | off | saving | offline
+let dirty = false;
 
-/* last write wins per site, same rule the Worker applies */
 function mergeMarks(base, incoming){
   const out = { ...base };
   for (const id of Object.keys(incoming || {})){
@@ -407,15 +348,13 @@ function mergeMarks(base, incoming){
 function paintSync(){
   const el = $('#sync');
   if (el){
-    el.textContent = {
-      on:'synced', saving:'saving…', offline:'saved on device', off:'', idle:''
-    }[sync] || '';
+    el.textContent = { on:'synced', saving:'saving…', offline:'saved on device', off:'', idle:'' }[sync] || '';
     el.className = 'sync' + (sync === 'offline' ? ' warn' : '');
   }
   const note = $('#storagenote');
   if (note) note.textContent = sync === 'off'
-    ? 'Your marks are stored on this device only.'
-    : 'Your marks sync across your devices.';
+    ? 'Your reports are stored on this device only.'
+    : 'Your reports sync across your devices.';
 }
 
 async function saveMarks(){
@@ -429,10 +368,8 @@ async function pushMarks(){
   sync = 'saving'; paintSync();
   try{
     const r = await fetch(SYNC_URL, {
-      method:'PUT',
-      headers:{ 'content-type':'application/json' },
-      body: JSON.stringify({ marks }),
-      cache:'no-store'
+      method:'PUT', headers:{ 'content-type':'application/json' },
+      body: JSON.stringify({ marks }), cache:'no-store'
     });
     if (r.status === 503 || r.status === 404){ sync = 'off'; paintSync(); return; }
     if (!r.ok) throw new Error('HTTP '+r.status);
@@ -440,9 +377,7 @@ async function pushMarks(){
     marks = mergeMarks(marks, j.marks || {});
     await Store.set('stump.marks', JSON.stringify(marks));
     dirty = false; sync = 'on';
-  }catch(e){
-    sync = 'offline';           // keep the local copy; retry on the next tick
-  }
+  }catch(e){ sync = 'offline'; }
   paintSync();
 }
 
@@ -458,20 +393,17 @@ async function pullMarks({ quiet = false } = {}){
     sync = 'on'; paintSync();
     if (JSON.stringify(marks) !== before){
       await Store.set('stump.marks', JSON.stringify(marks));
-      if (!quiet) applyTab();
+      if (!quiet) repaint();
       return true;
     }
-  }catch(e){
-    sync = 'offline'; paintSync();
-  }
+  }catch(e){ sync = 'offline'; paintSync(); }
   return false;
 }
 
-/* pick up edits made on the other device */
 function watchForRemoteEdits(){
   setInterval(() => { if (!document.hidden) pullMarks(); }, 30000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden){ if (dirty) pushMarks(); else pullMarks(); }
+    if (!document.hidden){ dirty ? pushMarks() : pullMarks(); }
   });
   window.addEventListener('online', () => { dirty ? pushMarks() : pullMarks(); });
 }
@@ -481,7 +413,8 @@ function watchForRemoteEdits(){
    ============================================================ */
 const $ = s => document.querySelector(s);
 const rad = x => x * Math.PI / 180;
-const deg = x => x * 180 / Math.PI;
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function normAddr(r){
   const n = (r.street_number||'').replace(/^0+/,'');
@@ -489,33 +422,17 @@ function normAddr(r){
   const s = (r.street_name||'').toUpperCase().trim();
   return (n && s) ? n+'|'+d+'|'+s : null;
 }
-
 function titleCase(str){
   const keep = {N:'N',S:'S',E:'E',W:'W',NE:'NE',NW:'NW',SE:'SE',SW:'SW'};
-  return (str||'').split(/\s+/).map(w=>{
-    if (keep[w.toUpperCase()]) return keep[w.toUpperCase()];
-    return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
-  }).join(' ');
+  return (str||'').split(/\s+/).map(w =>
+    keep[w.toUpperCase()] || (w.charAt(0).toUpperCase()+w.slice(1).toLowerCase())).join(' ');
 }
-
-/* great-circle distance in miles */
 function miles(a,b){
   const R = 3958.8;
   const dLat = rad(b.lat-a.lat), dLng = rad(b.lng-a.lng);
   const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(h));
 }
-const feet = (a,b) => miles(a,b) * 5280;
-
-/* initial bearing from a to b, degrees clockwise from true north */
-function bearing(a,b){
-  const dLng = rad(b.lng - a.lng);
-  const y = Math.sin(dLng) * Math.cos(rad(b.lat));
-  const x = Math.cos(rad(a.lat))*Math.sin(rad(b.lat))
-          - Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(dLng);
-  return (deg(Math.atan2(y,x)) + 360) % 360;
-}
-
 function ago(iso){
   const days = Math.floor((Date.now()-new Date(iso))/864e5);
   if (days < 1) return 'today';
@@ -560,7 +477,6 @@ async function loadSites(){
     const k = normAddr(p); if (!k) continue;
     (plant[k] = plant[k] || []).push(p);
   }
-
   const byAddr = {};
   for (const r of removals){
     const k = normAddr(r); if (!k || !r.closed_date) continue;
@@ -571,15 +487,16 @@ async function loadSites(){
   for (const k in byAddr){
     const r = byAddr[k];
     const reqs = plant[k] || [];
-    const covered = reqs.some(p => p.created_date > r.closed_date || p.status === 'Open');
-    if (covered) continue;
+    if (reqs.some(p => p.created_date > r.closed_date || p.status === 'Open')) continue;
     const street = titleCase([r.street_direction, r.street_name, r.street_type].filter(Boolean).join(' '));
     sites.push({
       id: r.sr_number,
+      num: parseInt(r.street_number,10) || 0,
+      street,
+      sortKey: (r.street_name||'').toUpperCase() + ' ' + String(parseInt(r.street_number,10)||0).padStart(6,'0'),
       address: r.street_number+' '+street,
       zip: r.zip_code || '60657',
-      lat: +r.latitude,
-      lng: +r.longitude,
+      lat: +r.latitude, lng: +r.longitude,
       closed: r.closed_date
     });
   }
@@ -587,9 +504,10 @@ async function loadSites(){
 }
 
 /* ============================================================
-   311 PACKET
+   THE 311 PACKET
    ============================================================ */
 function packet(s){
+  const when = marks[s.id] && marks[s.id].at ? marks[s.id].at : new Date().toISOString();
   return {
     'Request type': 'Tree Planting Request',
     'Address': `${s.address}, Chicago, IL ${s.zip}`,
@@ -597,476 +515,243 @@ function packet(s){
       `On the public parkway in front of ${s.address}. The parkway tree at this ` +
       `location was removed by the city and the tree pit is now empty. ` +
       `Prior removal service request ${s.id}, closed ${longDate(s.closed)}. ` +
-      `Site verified empty in person on ${longDate(new Date().toISOString())}.`,
+      `Site verified empty in person on ${longDate(when)}.`,
     'How many trees are you requesting?': '1',
     'Has a tree been planted recently?': 'No'
   };
 }
-function packetText(s){
-  const p = packet(s);
-  return Object.keys(p).map(k => k+'\n'+p[k]).join('\n\n');
-}
+const packetText = s => Object.entries(packet(s)).map(([k,v]) => k+'\n'+v).join('\n\n');
 
 /* ============================================================
    STATE
    ============================================================ */
 let SITES = [];
-let tab = 'walk', stab = 'none', shownSaved = PAGE;
-let skipped = new Set();
-let me = null, accuracy = null;
-let geo = 'idle';        // idle | locating | on | blocked | timeout | unavailable | unsupported
-let watchId = null;
-let heading = null;
-let compass = 'idle';    // idle | ask | on | denied | unsupported
-let override = false;    // user chose to mark from a distance
-let picked = null;       // site id chosen from the map, overrides "nearest"
-let map = null, layer = null;
-let showHelp = false;    // location recovery steps expanded
-let geoTried = false;    // user has pressed "turn on location" at least once
-let permState = null;    // what navigator.permissions reports, when supported
-let lastGeoErr = null;   // {code, message, ms} of the most recent failure
-let triedCoarse = false; // fell back to a coarse fix after a high-accuracy miss
-let meManual = false;    // position was dropped by hand, not by the GPS
-let setPos = false;      // map is armed to accept a tap as "I am here"
-
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let tab = 'browse', view = 'list', sort = 'street', todoOnly = false;
+let query = '', detailId = null;
+let map = null, layer = null, mini = null;
 
 const stateOf = s => (marks[s.id] && marks[s.id].state) || 'open';
-const from = () => me || HOME;
+const byId = id => SITES.find(s => s.id === id);
+const tasks = () => SITES.filter(s => stateOf(s) === 'none')
+                         .sort((a,b) => (marks[b.id].at||'').localeCompare(marks[a.id].at||''));
+const doneTasks = () => SITES.filter(s => stateOf(s) === 'req')
+                         .sort((a,b) => (marks[b.id].at||'').localeCompare(marks[a.id].at||''));
 
-function queue(){
-  return SITES.filter(s => stateOf(s) === 'open' && !skipped.has(s.id))
-              .sort((a,b) => miles(from(),a) - miles(from(),b));
+function filtered(){
+  const q = query.trim().toLowerCase();
+  let list = SITES.filter(s => !q || s.address.toLowerCase().includes(q));
+  if (todoOnly) list = list.filter(s => stateOf(s) === 'open');
+  if (sort === 'near')      list.sort((a,b) => miles(HOME,a) - miles(HOME,b));
+  else if (sort === 'new')  list.sort((a,b) => b.closed.localeCompare(a.closed));
+  else                      list.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
+  return list;
 }
-/* whatever the map picked, else the nearest unchecked site */
-function target(){
-  const q = queue();
-  if (picked){
-    const p = q.find(s => s.id === picked);
-    if (p) return p;
-    picked = null;              // it got marked or skipped; fall back to nearest
-  }
-  return q[0] || null;
-}
-const isPicked = () => { const t = target(); return !!(picked && t && t.id === picked && queue()[0] !== t); };
+
+const PILL = { open:['',''], none:['none','No tree'], req:['req','Filed'], tree:['tree','Has tree'] };
+const PIN  = { open:'#0B0B0C', none:'#E2330A', req:'#0B7A38', tree:'#B8B6AE' };
 
 /* ============================================================
-   LOCATION + COMPASS
+   BROWSE
    ============================================================ */
-function startGeo({ coarse = false } = {}){
-  if (!navigator.geolocation){ geo = 'unsupported'; renderWalk(); return; }
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  const asked = Date.now();
-  if (!coarse) triedCoarse = false;
-  geo = 'locating'; renderWalk();
-  watchId = navigator.geolocation.watchPosition(
-    pos => {
-      me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      accuracy = pos.coords.accuracy;
-      geo = 'on'; lastGeoErr = null;
-      if (tab === 'walk') renderWalk();
-      if (tab === 'map') renderMap();
-    },
-    err => {
-      me = null;
-      const ms = Date.now() - asked;
-      lastGeoErr = { code: err.code, message: err.message || '', ms };
-      // 1 PERMISSION_DENIED · 2 POSITION_UNAVAILABLE · 3 TIMEOUT
-      geo = err.code === 1 ? 'blocked' : err.code === 3 ? 'timeout' : 'unavailable';
+function renderBrowse(){
+  const list = filtered();
+  $('#count').textContent =
+    `${list.length} site${list.length===1?'':'s'}${todoOnly?' unchecked':''}${query?' matching “'+query+'”':''}`;
 
-      // A weak or missing high-accuracy fix is often satisfiable with a
-      // coarse one, which is plenty for "which pit am I standing at".
-      if ((err.code === 2 || err.code === 3) && !triedCoarse){
-        triedCoarse = true;
-        startGeo({ coarse:true });
-        return;
-      }
-      // An instant refusal means the browser never asked: the permission is
-      // already stored as denied, so pressing the button again cannot help.
-      if (geoTried && err.code === 1 && ms < 1000) showHelp = true;
-      if (tab === 'walk') renderWalk();
-    },
-    coarse
-      ? { enableHighAccuracy:false, maximumAge:60000, timeout:30000 }
-      : { enableHighAccuracy:true,  maximumAge:5000,  timeout:20000 }
-  );
-}
+  $('#list').hidden = view !== 'list';
+  $('#mapwrap').hidden = view !== 'map';
 
-/* if the browser already knows the answer, reflect it before any prompt */
-async function primeGeo(){
-  try{
-    if (!navigator.permissions || !navigator.permissions.query) return;
-    const st = await navigator.permissions.query({ name:'geolocation' });
-    permState = st.state;
-    if (st.state === 'denied'){ geo = 'blocked'; renderWalk(); }
-    st.onchange = () => {
-      permState = st.state;
-      if (st.state === 'granted') startGeo();
-    };
-  }catch(e){ permState = 'unsupported'; }  // Safari doesn't expose this one
-}
+  if (view === 'map'){ renderMap(list); return; }
 
-function onOrient(e){
-  let h = null;
-  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
-  else if (typeof e.alpha === 'number' && (e.absolute || e.type === 'deviceorientationabsolute'))
-    h = (360 - e.alpha) % 360;
-  if (h === null || isNaN(h)) return;
-  const first = compass !== 'on';
-  heading = h; compass = 'on';
-  // the arrow only exists once compass is 'on', so the first fix has to rebuild the screen
-  if (first && tab === 'walk') renderWalk();
-  else paintArrow();
-}
-
-function attachOrient(){
-  if ('ondeviceorientationabsolute' in window)
-    window.addEventListener('deviceorientationabsolute', onOrient);
-  else
-    window.addEventListener('deviceorientation', onOrient);
-}
-
-function startCompass(){
-  if (typeof DeviceOrientationEvent === 'undefined'){ compass = 'unsupported'; renderWalk(); return; }
-  if (typeof DeviceOrientationEvent.requestPermission === 'function'){
-    DeviceOrientationEvent.requestPermission()
-      .then(r => { if (r === 'granted'){ attachOrient(); } else { compass = 'denied'; } renderWalk(); })
-      .catch(() => { compass = 'denied'; renderWalk(); });
-  } else {
-    attachOrient();
+  if (!list.length){
+    $('#list').innerHTML = `<p class="msg">Nothing matches.<br>Try a different search.</p>`;
+    return;
   }
+  $('#list').innerHTML = list.map(s => {
+    const st = stateOf(s);
+    const [cls, label] = PILL[st];
+    return `<button class="row" data-open="${esc(s.id)}">
+      <span class="rmain">
+        <span class="raddr">${esc(s.address)}</span>
+        <span class="rmeta">Removal closed ${ago(s.closed)} · ${miles(HOME,s).toFixed(2)} mi from home</span>
+      </span>
+      ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
+      <span class="chev">›</span>
+    </button>`;
+  }).join('');
 }
 
-function initCompass(){
-  if (typeof DeviceOrientationEvent === 'undefined'){ compass = 'unsupported'; return; }
-  // iOS needs a user gesture; everything else can listen straight away
-  if (typeof DeviceOrientationEvent.requestPermission === 'function') compass = 'ask';
-  else attachOrient();
-}
-
-/* Recovery steps, written for the browser actually in hand. iOS Safari has
-   no lock icon and no per-site menu in the usual place, so generic
-   "click the padlock" advice sends people looking for something absent. */
-function geoHelp(){
-  const instant = lastGeoErr && lastGeoErr.code === 1 && lastGeoErr.ms < 1000;
-  // Safari reporting the permission as granted while refusing the call is a
-  // browser-side contradiction. Nothing in these settings will fix it, so say
-  // that rather than sending someone round the settings app again.
-  if (permState === 'granted' && lastGeoErr && lastGeoErr.code === 1){
-    return `<b>Safari is contradicting itself here.</b>
-      It reports permission as <b>granted</b>, then refuses the request
-      ${lastGeoErr.ms}ms later. That's a browser fault, not a setting you got wrong,
-      and no permission toggle will clear it.
-      <ol>
-        <li>Worth one try: fully close this tab and Safari (swipe it away from
-            the app switcher), then reopen. This clears the stuck state on some
-            iOS builds.</li>
-        <li>Otherwise use <b>Drop my position on the map</b> above — everything
-            else in the app works normally from a hand-placed position.</li>
-      </ol>
-      <p class="diag">${diagLine()}</p>`;
-  }
-  const body = IS_IOS ? `
-    ${instant ? `<b>Safari has a saved "Don't Allow" for this site.</b>
-      It won't ask again until you clear it — asking on load can't override that.` : ''}
-    <ol>
-      <li><b>Settings → Safari</b> → scroll to <b>Settings for Websites</b> →
-          <b>Location</b>. Find this site and set it to <b>Ask</b> or
-          <b>Allow</b>, then reload here.</li>
-      <li>If it isn't listed, tap the <b>page icon</b> left of the address bar →
-          <b>Website Settings</b> → <b>Location</b>.</li>
-      <li>Check <b>Settings → Privacy &amp; Security → Location Services</b> is on,
-          and <b>Safari Websites</b> is set to <b>While Using the App</b>.</li>
-    </ol>
-    Private Browsing blocks location on some iOS versions.` : `
-    ${instant ? `<b>This browser has a saved block for this site.</b>` : ''}
-    <ol>
-      <li>Tap the <b>lock</b> or <b>ⓘ</b> icon beside the address bar →
-          <b>Location</b> → <b>Allow</b>, then reload.</li>
-      <li>Check your device's own location setting is on for this browser.</li>
-    </ol>`;
-  return body + `<p class="diag">${diagLine()}</p>`;
-}
-
-/* Exact state, so a problem on a phone we can't inspect stops being guesswork */
-function diagLine(){
-  const codes = { 1:'1 denied', 2:'2 unavailable', 3:'3 timeout' };
-  const line = [
-    'perm: ' + (permState || 'unknown'),
-    'err: ' + (lastGeoErr ? (codes[lastGeoErr.code] || lastGeoErr.code) + ' in ' + lastGeoErr.ms + 'ms' : 'none'),
-    'secure: ' + (window.isSecureContext ? 'yes' : 'NO'),
-    'coarse tried: ' + (triedCoarse ? 'yes' : 'no')
-  ].join(' · ');
-  const msg = lastGeoErr && lastGeoErr.message ? '<br>said: “' + lastGeoErr.message + '”' : '';
-  return line + msg;
-}
-
-/* rotate without spinning the long way round */
-let arrowAngle = 0;
-function paintArrow(){
-  const rot = $('#arrowRot');
-  const t = target();
-  if (!rot || !t || !me || heading === null) return;
-  const want = (bearing(me, t) - heading + 360) % 360;
-  arrowAngle += ((want - arrowAngle) % 360 + 540) % 360 - 180;
-  rot.style.transform = `rotate(${arrowAngle}deg)`;
-}
-
-/* ============================================================
-   WALK SCREEN
-   ============================================================ */
-const ARROW_SVG = `
-  <svg viewBox="0 0 100 100" aria-hidden="true">
-    <g id="arrowRot"><path d="M50 6 L88 90 L50 68 L12 90 Z" fill="currentColor"/></g>
-  </svg>`;
-const HERE_SVG = `
-  <svg viewBox="0 0 100 100" aria-hidden="true">
-    <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" stroke-width="7"/>
-    <path d="M32 51 L45 64 L70 38" fill="none" stroke="currentColor" stroke-width="9"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-function renderWalk(){
-  const el = $('#walk');
-  const dock = $('#dock');
-  const t = target();
-
-  $('#leftcount').textContent = SITES.length
-    ? SITES.filter(s => stateOf(s) === 'open').length + ' left'
-    : '—';
-
-  if (!SITES.length){
-    el.innerHTML = `<p class="msg"><span class="spin">◍</span><br>Reading Chicago 311…</p>`;
-    dock.hidden = true; return;
-  }
-  if (!t){
-    el.innerHTML = `<p class="msg"><b>All checked</b>
-      Nothing left to walk to.<br>New removals show up here as the city closes them.
-      ${skipped.size ? `<br><br><button class="linkish" id="unskip">Bring back ${skipped.size} skipped</button>` : ''}</p>`;
-    dock.hidden = true; return;
-  }
-
-  const known = !!me;                 // GPS fix or a position dropped by hand
-  const ft = known ? feet(me, t) : null;
-  const arrived = known && ft <= ARRIVE_FT;
-  const canMark = arrived || override || !known;
-
-  // distance readout — when there's no fix the address is the hero instead,
-  // so the screen stays usable for marking by eye
-  let readout;
-  if (!known){
-    const label = {
-      locating:   'Finding you…',
-      blocked:    'Location blocked',
-      timeout:    'No GPS fix — signal is weak',
-      unavailable:'Location unavailable',
-      unsupported:'No location in this browser',
-      idle:       'Location off'
-    }[geo] || 'Location off';
-    const canRetry = geo !== 'locating' && geo !== 'unsupported';
-    readout = `
-      <div class="banner${geo === 'locating' ? '' : ' bad'}">
-        <span class="bmsg">${geo === 'locating' ? '<span class="spin">◍</span> ' : '⚠ '}${label}</span>
-        ${canRetry ? `<button class="bbtn" id="enable-geo">Retry</button>` : ''}
-        ${canRetry ? `<button class="linkish bhelp" id="toggle-help">${showHelp ? 'hide' : 'why'}</button>` : ''}
-      </div>
-      ${canRetry ? `<button class="bigbtn" id="go-setpos">Drop my position on the map</button>
-        <p class="distunit" style="margin-bottom:1.2rem">then distances and sorting work as normal</p>` : ''}
-      ${showHelp && canRetry ? `<div class="help">${geoHelp()}</div>` : ''}`;
-  } else if (arrived){
-    readout = `<p class="arrivedbig">You're here</p>
-      <p class="distunit">within ${Math.round(ft)} ft</p>`;
-  } else if (ft < 1000){
-    readout = `<p class="distnum">${Math.round(ft)}</p><p class="distunit">feet away</p>`;
-  } else {
-    readout = `<p class="distnum">${(ft/5280).toFixed(2)}</p><p class="distunit">miles away</p>`;
-  }
-
-  // dial: compass arrow, arrival check, or nothing
-  let dial = '';
-  if (arrived) dial = `<div class="dial arrived">${HERE_SVG}</div>`;
-  else if (known && compass === 'on' && heading !== null) dial = `<div class="dial">${ARROW_SVG}</div>`;
-
-  // hint line under the address
-  let hint = '';
-  if (!known)
-    hint = `Sorted from ${HOME.label} — mark by eye until location works.`;
-  else if (meManual)
-    hint = (arrived
-        ? `<b>Look at the parkway strip.</b>`
-        : `Get within ${ARRIVE_FT} ft to check in ·
-           <button class="linkish" id="override">Mark from here</button>`)
-      + `<br>Position set by hand ·
-         <button class="linkish" id="go-setpos">move it</button> ·
-         <button class="linkish" id="clear-manual">clear</button>`;
-  else if (arrived)
-    hint = `<b>Look at the parkway strip.</b>`;
-  else if (compass === 'ask')
-    hint = `<button class="linkish" id="ask-compass">Turn on compass</button> to see which way to walk`;
-  else if (!canMark)
-    hint = `Get within ${ARRIVE_FT} ft to check in · <button class="linkish" id="override">Mark from here</button>`;
-  else if (override)
-    hint = `Marking from ${Math.round(ft)} ft away`;
-
-  if (known && accuracy && accuracy > 40 && !arrived)
-    hint += `<br><span class="warn">GPS is fuzzy (±${Math.round(accuracy*3.28)} ft)</span>`;
-
-  el.classList.toggle('nofix', !known);
-  el.innerHTML = `
-    ${dial}
-    ${readout}
-    ${isPicked() ? `<p class="pickedtag">Picked from map ·
-       <button class="linkish" id="unpick">back to nearest</button></p>` : ''}
-    <h2 class="addr">${t.address}</h2>
-    <p class="sub">Removal closed ${ago(t.closed)} · ${longDate(t.closed)}</p>
-    <p class="hint">${hint}</p>
-    <a class="walkto" target="_blank" rel="noopener"
-       href="https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}">Open in maps</a>
-    <p class="hint"><button class="linkish" id="skip">Skip this one</button></p>
-  `;
-
-  dock.hidden = false;
-  dock.classList.toggle('far', !canMark);
-  $('#btn-tree').disabled = !canMark;
-  $('#btn-none').disabled = !canMark;
-  $('#btn-tree').dataset.id = t.id;
-  $('#btn-none').dataset.id = t.id;
-
-  paintArrow();
-}
-
-/* ============================================================
-   MAP SCREEN
-   ============================================================ */
 function ensureMap(){
   if (map || typeof L === 'undefined') return;
   map = L.map('map', { attributionControl:true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom:19,
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
-  // When armed, a tap on the map is "I am standing here" — the way to use
-  // this app at all when the browser will not hand over a GPS fix.
-  map.on('click', e => {
-    if (!setPos) return;
-    me = { lat:e.latlng.lat, lng:e.latlng.lng };
-    accuracy = null; meManual = true; setPos = false;
-    tab = 'walk'; applyTab();
-  });
 }
 
-function renderMap(){
+function renderMap(list){
   if (typeof L === 'undefined'){
-    $('#map').innerHTML = `<p class="msg">Map library didn't load.<br>Use the Walk screen or "Open in maps".</p>`;
+    $('#map').innerHTML = `<p class="msg">Map didn't load.<br>Use the list instead.</p>`;
     return;
   }
-  ensureMap();
-  if (!map) return;
+  ensureMap(); if (!map) return;
   layer.clearLayers();
-
-  const list = queue();
-  const next = list[0];
   const pts = [];
-
-  if (me){
-    L.circleMarker([me.lat, me.lng], {
-      radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
-    }).addTo(layer).bindPopup(`<b>You</b>`);
-    pts.push([me.lat, me.lng]);
-  }
-
   list.forEach(s => {
-    const isNext = next && s.id === next.id;
-    const m = L.circleMarker([s.lat, s.lng], {
-      radius: isNext ? 10 : 7, weight:2, color:'#fff',
-      fillColor: isNext ? '#E2330A' : '#0B0B0C', fillOpacity:1
+    const st = stateOf(s);
+    const m = L.circleMarker([s.lat,s.lng], {
+      radius:8, weight:2, color:'#fff', fillColor:PIN[st], fillOpacity:1
     }).addTo(layer);
-    // tapping a pin takes you straight to that site's card, ready to mark
-    m.on('click', () => { picked = s.id; override = false; tab = 'walk'; applyTab(); });
-    m.bindTooltip(s.address, { direction:'top', offset:[0,-6] });
-    pts.push([s.lat, s.lng]);
+    m.bindPopup(
+      `<b>${esc(s.address)}</b>
+       <span class="pm">Removal closed ${ago(s.closed)}</span>
+       <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`);
+    pts.push([s.lat,s.lng]);
   });
-
   if (pts.length > 1) map.fitBounds(pts, { padding:[30,30], maxZoom:17 });
-  else if (pts.length) map.setView(pts[0], 16);
-  else map.setView([HOME.lat, HOME.lng], 15);
+  else if (pts.length) map.setView(pts[0], 17);
+  else map.setView([HOME.lat,HOME.lng], 15);
+  requestAnimationFrame(() => map.invalidateSize());
 }
 
 /* ============================================================
-   SAVED SCREEN
+   DETAIL
    ============================================================ */
-function renderSaved(){
-  const list = SITES.filter(s => stateOf(s) === stab).sort((a,b) => miles(HOME,a) - miles(HOME,b));
-  const el = $('#savedlist');
+function renderDetail(){
+  const s = byId(detailId);
+  const el = $('#detail');
+  if (!s){ el.innerHTML = `<p class="msg">Site not found.</p>`; return; }
+  const st = stateOf(s);
+  const when = marks[s.id] && marks[s.id].at;
 
-  if (!list.length){
-    el.innerHTML = `<p class="msg">${{
-      none:'Nothing to file yet.<br>Sites you mark "No tree" collect here with a ready-to-paste 311 request.',
-      req:'Nothing filed yet.',
-      tree:'No sites marked as still having a tree.'
-    }[stab]}</p>`;
+  const banner = st === 'none' ? `<div class="state none">
+        Reported <b>no tree</b> ${when?ago(when):''} — a task is waiting for you under <b>Tasks</b>.</div>`
+    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}.</div>`
+    : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
+    : '';
+
+  const choices = st === 'open' ? `
+      <p class="ask">Standing here — is there a tree in the parkway?</p>
+      <div class="choices">
+        <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
+        <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+      </div>`
+    : `<div class="btnrow">
+        ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to task</button>` : ''}
+        ${st === 'req'  ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen task</button>` : ''}
+        <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
+      </div>`;
+
+  el.innerHTML = `
+    <button class="back" id="back">‹ All sites</button>
+    <h2 class="daddr">${esc(s.address)}</h2>
+    ${banner}
+    <div id="minimap"></div>
+    <dl class="facts">
+      <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)}</dd></div>
+      <div class="fact"><dt>That was</dt><dd>${ago(s.closed)}</dd></div>
+      <div class="fact"><dt>City request</dt><dd>${esc(s.id)}</dd></div>
+      <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
+      <div class="fact"><dt>From home</dt><dd>${miles(HOME,s).toFixed(2)} mi</dd></div>
+    </dl>
+    <div class="btnrow">
+      <a class="mini ghost" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Directions</a>
+      <a class="mini ghost" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${s.lat},${s.lng}">Street view</a>
+    </div>
+    <div style="margin-top:1.3rem">${choices}</div>
+  `;
+
+  // small map so you can confirm you're looking at the right pit
+  if (typeof L !== 'undefined'){
+    if (mini){ mini.remove(); mini = null; }
+    mini = L.map('minimap', { attributionControl:false, zoomControl:false, dragging:false,
+      scrollWheelZoom:false, doubleClickZoom:false, touchZoom:false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(mini);
+    L.circleMarker([s.lat,s.lng], { radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1 }).addTo(mini);
+    mini.setView([s.lat,s.lng], 17);
+    requestAnimationFrame(() => mini.invalidateSize());
+  } else {
+    $('#minimap').hidden = true;
+  }
+}
+
+/* ============================================================
+   TASKS
+   ============================================================ */
+function renderTasks(){
+  const todo = tasks(), done = doneTasks();
+  const el = $('#tasklist');
+
+  const badge = $('#taskbadge');
+  badge.hidden = !todo.length;
+  badge.textContent = todo.length;
+
+  if (!todo.length && !done.length){
+    el.innerHTML = `<p class="msg"><b>No tasks yet</b>
+      Report a site as “No tree” and a filing task shows up here,
+      with the 311 wording already written for you.</p>`;
     return;
   }
 
-  el.innerHTML = list.slice(0, shownSaved).map(s => {
-    const st = stateOf(s);
+  const card = (s, isDone) => {
     const p = packet(s);
     const fields = Object.keys(p).map((k,i) => `
       <div class="field">
-        <span class="flabel">${k}</span>
-        <div class="fval"><p>${p[k]}</p>
-        <button class="copy" data-copy="${s.id}::${i}">Copy</button></div>
+        <span class="flabel">${esc(k)}</span>
+        <div class="fval"><p>${esc(p[k])}</p>
+        <button class="copy" data-copy="${esc(s.id)}::${i}">Copy</button></div>
       </div>`).join('');
-
-    const acts = st === 'none' ? `
-        <a class="mini hot" target="_blank" rel="noopener"
-           href="https://www.chicago.gov/city/en/depts/streets/provdrs/forestry/svcs/tree_planting.html">Open 311 form</a>
-        <button class="mini fill" data-mark="${s.id}::req">Mark as filed</button>
-        <button class="mini ghost" data-mark="${s.id}::open">Undo</button>`
-      : `<button class="mini ghost" data-mark="${s.id}::open">Back to check</button>`;
-
-    return `<article class="card k-${st}">
-      <h3>${s.address}</h3>
-      <p class="cm">${(miles(HOME,s)).toFixed(2)} mi from ${HOME.label} ·
-        closed ${ago(s.closed)} · ${s.id}</p>
-      <div class="row">${acts}</div>
-      ${st === 'none' ? `<div class="packet"><h4>Paste this into the 311 request</h4>${fields}
-        <div class="row">
-          <button class="mini fill" data-copyall="${s.id}">Copy everything</button>
+    return `<article class="task${isDone?' done':''}">
+      <h3>${esc(s.address)}</h3>
+      <p class="tm">Reported ${ago(marks[s.id].at)} · removal ${s.id} closed ${longDate(s.closed)}</p>
+      ${isDone ? `<div class="btnrow">
+          <button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen</button>
+        </div>`
+      : `<ol class="steps">
+          <li>Open the 311 planting request form.</li>
+          <li>Paste each field below.</li>
+          <li>Submit, then mark it filed here.</li>
+        </ol>
+        <div class="btnrow">
+          <a class="mini hot" target="_blank" rel="noopener" href="${FORM_311}">Open 311 form</a>
+          <button class="mini fill" data-copyall="${esc(s.id)}">Copy everything</button>
+        </div>
+        <div class="packet"><h4>Paste this into the 311 request</h4>${fields}</div>
+        <div class="btnrow">
+          <button class="mini fill" data-mark="${esc(s.id)}::req">Mark as filed</button>
           <a class="mini ghost" href="tel:311">Call 311</a>
-        </div></div>` : ''}
+        </div>`}
     </article>`;
-  }).join('') + (list.length > shownSaved
-    ? `<button class="mini ghost" id="moresaved" style="width:100%">Show ${Math.min(PAGE, list.length-shownSaved)} more</button>`
-    : '');
+  };
+
+  el.innerHTML =
+    (todo.length ? `<p class="count">${todo.length} to file</p>` + todo.map(s => card(s,false)).join('') : '') +
+    (done.length ? `<p class="count" style="margin-top:1.5rem">${done.length} filed</p>` +
+                   done.map(s => card(s,true)).join('') : '');
 }
 
 /* ============================================================
-   TABS
+   PAINT
    ============================================================ */
-function applyTab(){
-  $('#walk').hidden        = tab !== 'walk';
-  $('#mapscreen').hidden   = tab !== 'map';
-  $('#savedscreen').hidden = tab !== 'saved';
-  $('#dock').hidden        = tab !== 'walk';
+function repaint(){
+  const open = SITES.filter(s => stateOf(s) === 'open').length;
+  $('#leftcount').textContent = SITES.length ? open + ' unchecked' : '—';
+  const badge = $('#taskbadge');
+  badge.hidden = !tasks().length;
+  badge.textContent = tasks().length;
 
-  const tip = $('#maptip'), btn = $('#setpos-btn');
-  if (tip){
-    tip.hidden = !setPos;
-    tip.innerHTML = `Tap the map where you're standing ·
-      <button class="linkish" id="cancel-setpos">cancel</button>`;
-  }
-  if (btn) btn.textContent = meManual ? 'Move my position' : 'Set my position';
-  const mapEl = $('#map'); if (mapEl) mapEl.classList.toggle('arming', setPos);
-
+  $('#browse').hidden = !(tab === 'browse' && !detailId);
+  $('#detail').hidden = !(tab === 'browse' && detailId);
+  $('#tasks').hidden  = tab !== 'tasks';
   document.querySelectorAll('.tab[data-tab]').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
 
-  if (tab === 'walk') renderWalk();
-  if (tab === 'map'){ renderMap(); requestAnimationFrame(() => map && map.invalidateSize()); }
-  if (tab === 'saved') renderSaved();
+  if (tab === 'browse' && detailId) renderDetail();
+  else if (tab === 'browse') renderBrowse();
+  else renderTasks();
 }
 
 /* ============================================================
@@ -1074,89 +759,63 @@ function applyTab(){
    ============================================================ */
 document.addEventListener('click', async e => {
   const tb = e.target.closest('.tab[data-tab]');
-  if (tb){ tab = tb.dataset.tab; applyTab(); return; }
+  if (tb){ tab = tb.dataset.tab; detailId = null; repaint(); return; }
 
-  const sb = e.target.closest('.tab[data-stab]');
-  if (sb){
-    stab = sb.dataset.stab; shownSaved = PAGE;
-    document.querySelectorAll('.tab[data-stab]').forEach(b =>
-      b.setAttribute('aria-pressed', String(b.dataset.stab === stab)));
-    renderSaved(); return;
-  }
-
-  const act = e.target.closest('.act');
-  if (act && !act.disabled){
-    const id = act.dataset.id;
-    marks[id] = { state: act.id === 'btn-none' ? 'none' : 'tree', at: new Date().toISOString() };
-    picked = null; override = false;
-    await saveMarks();
-    renderWalk();
-    return;
+  const vb = e.target.closest('.seg button[data-view]');
+  if (vb){
+    view = vb.dataset.view;
+    document.querySelectorAll('.seg button').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+    renderBrowse(); return;
   }
 
-  if (e.target.closest('#skip')){
-    const t = target(); if (t) skipped.add(t.id);
-    picked = null; override = false; renderWalk(); return;
+  const sc = e.target.closest('.chip[data-sort]');
+  if (sc){
+    if (sc.dataset.sort === 'todo'){
+      todoOnly = !todoOnly;
+      sc.setAttribute('aria-pressed', String(todoOnly));
+    } else {
+      sort = sc.dataset.sort;
+      document.querySelectorAll('.chip[data-sort]').forEach(b => {
+        if (b.dataset.sort !== 'todo') b.setAttribute('aria-pressed', String(b.dataset.sort === sort));
+      });
+    }
+    renderBrowse(); return;
   }
-  if (e.target.closest('#unskip')){ skipped.clear(); renderWalk(); return; }
-  if (e.target.closest('#unpick')){ picked = null; renderWalk(); return; }
-  if (e.target.closest('#override')){ override = true; renderWalk(); return; }
-  if (e.target.closest('#enable-geo')){
-    geoTried = true;
-    // Called with nothing awaited before it, so this still counts as a user
-    // gesture. Some iOS builds refuse watchPosition but honour this one.
-    try{
-      const t0 = Date.now();
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          me = { lat:pos.coords.latitude, lng:pos.coords.longitude };
-          accuracy = pos.coords.accuracy; meManual = false;
-          geo = 'on'; lastGeoErr = null;
-          startGeo();
-        },
-        err => {
-          lastGeoErr = { code:err.code, message:err.message||'', ms:Date.now()-t0 };
-          if (err.code === 1) showHelp = true;
-          startGeo();
-        },
-        { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
-      );
-    }catch(e){ startGeo(); }
-    return;
-  }
-  if (e.target.closest('#toggle-help')){ showHelp = !showHelp; renderWalk(); return; }
-  if (e.target.closest('#go-setpos')){
-    setPos = true; tab = 'map'; applyTab(); return;
-  }
-  if (e.target.closest('#clear-manual')){
-    meManual = false; me = null; setPos = false; renderWalk(); return;
-  }
-  if (e.target.closest('#cancel-setpos')){ setPos = false; applyTab(); return; }
-  if (e.target.closest('#ask-compass')){ startCompass(); return; }
-  if (e.target.closest('#moresaved')){ shownSaved += PAGE; renderSaved(); return; }
-  if (e.target.closest('#setpos-btn')){ setPos = true; applyTab(); return; }
+
+  const open = e.target.closest('[data-open]');
+  if (open){ detailId = open.dataset.open; tab = 'browse'; repaint(); window.scrollTo(0,0); return; }
+
+  if (e.target.closest('#back')){ detailId = null; repaint(); return; }
+
+  const goto = e.target.closest('[data-goto-task]');
+  if (goto){ tab = 'tasks'; detailId = null; repaint(); return; }
 
   const mk = e.target.closest('[data-mark]');
   if (mk){
     const [id, st] = mk.dataset.mark.split('::');
-    if (st === 'open') marks[id] = { state:'open', at:new Date().toISOString() };
-    else marks[id] = { state:st, at:new Date().toISOString() };
-    skipped.delete(id);
+    marks[id] = { state: st, at: new Date().toISOString() };
     await saveMarks();
-    renderSaved(); renderWalk(); return;
+    // reporting "no tree" is the moment a task is born — take them to it
+    if (st === 'none' && detailId === id){ tab = 'tasks'; detailId = null; }
+    repaint();
+    return;
   }
 
   const one = e.target.closest('[data-copy]');
   if (one){
     const [id, i] = one.dataset.copy.split('::');
-    const s = SITES.find(x => x.id === id);
-    copy(Object.values(packet(s))[+i], one); return;
+    copy(Object.values(packet(byId(id)))[+i], one); return;
   }
   const all = e.target.closest('[data-copyall]');
-  if (all){
-    const s = SITES.find(x => x.id === all.dataset.copyall);
-    copy(packetText(s), all); return;
-  }
+  if (all){ copy(packetText(byId(all.dataset.copyall)), all); return; }
+});
+
+let qt;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'q') return;
+  clearTimeout(qt);
+  qt = setTimeout(() => { query = e.target.value; renderBrowse(); }, 150);
 });
 
 function copy(text, btn){
@@ -1171,7 +830,7 @@ function copy(text, btn){
 }
 function fallbackCopy(text, done){
   const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
   document.body.appendChild(ta); ta.select();
   try{ document.execCommand('copy'); done(); }catch(e){}
   document.body.removeChild(ta);
@@ -1181,17 +840,13 @@ function fallbackCopy(text, done){
    BOOT
    ============================================================ */
 (async function init(){
-  renderWalk();
-  primeGeo();
-  startGeo();
-  initCompass();
+  $('#list').innerHTML = `<p class="msg"><span class="spin">◍</span><br>Reading Chicago 311…</p>`;
 
   try{
     const saved = await Store.get('stump.marks');
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
 
-  // fold in whatever the other device recorded, then publish anything only we have
   await pullMarks({ quiet:true });
   if (Object.keys(marks).length) await pushMarks();
   watchForRemoteEdits();
@@ -1200,13 +855,11 @@ function fallbackCopy(text, done){
     SITES = await loadSites();
     $('#tabs').hidden = false;
     $('#stamp').textContent = 'Loaded ' + new Date().toLocaleString('en-US',
-      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) +
-      ' · ' + SITES.length + ' open sites';
-    applyTab();
+      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' · ' + SITES.length + ' sites';
+    repaint();
   }catch(err){
-    $('#walk').innerHTML = `<p class="msg bad"><b>Can't reach the city</b>
-      ${err.message}<br>Pull to refresh, or try again in a minute.</p>`;
-    $('#dock').hidden = true;
+    $('#list').innerHTML = `<p class="msg bad"><b>Can't reach the city</b>
+      ${esc(err.message)}<br>Pull to refresh, or try again in a minute.</p>`;
   }
 })();
 </script>
