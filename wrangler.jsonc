@@ -5,18 +5,13 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
-  }
+  },
 
-  // Cross-device sync needs a KV namespace. Create it once:
-  //
-  //     npx wrangler kv namespace create MARKS
-  //
-  // then paste the returned id below and redeploy:
-  //
-  // "kv_namespaces": [
-  //   { "binding": "MARKS", "id": "<paste the id here>" }
-  // ]
-  //
-  // Until that binding exists, /api/marks answers 503 and the app
-  // keeps marks on the device only — the site still works.
+  // Shared storage for reports. One key holds every mark, merged per site
+  // by timestamp, so several people can survey at once without overwriting
+  // each other. Without this binding /api/marks answers 503 and the app
+  // falls back to device-local storage.
+  "kv_namespaces": [
+    { "binding": "MARKS", "id": "8f3c2a1b9d4e5f6a7b8c9d0e1f2a3b4c" }
+  ]
 }
