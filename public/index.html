@@ -138,6 +138,23 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-size:.58rem;color:var(--dim);margin:.7rem 0 0;
   word-break:break-word;opacity:.8;
 }
+.bigbtn{
+  margin:0 auto .5rem;padding:.9rem 1.4rem;display:block;
+  font-family:'Archivo',sans-serif;
+  font-variation-settings:'wdth' 78,'wght' 700;
+  font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;
+  background:var(--ink);color:var(--paper);border:2px solid var(--ink);
+  cursor:pointer;border-radius:0;min-height:3.1rem;
+}
+.bigbtn:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
+.maptip{
+  background:var(--ink);color:var(--paper);
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  padding:.6rem .75rem;margin-bottom:.6rem;text-align:center;
+}
+.maptip .linkish{color:var(--paper)}
+.maprow{display:flex;gap:.5rem;margin-top:.8rem}
+#map.arming{cursor:crosshair;outline:3px solid var(--hot);outline-offset:-3px}
 /* with no distance to show, the address carries the screen */
 #walk.nofix .addr{font-size:clamp(1.8rem,9vw,2.5rem);margin-top:0}
 .pickedtag{
@@ -294,11 +311,15 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <section id="walk"></section>
 
     <section id="mapscreen" class="scroller" hidden>
+      <div id="maptip" class="maptip" hidden></div>
       <div id="map"></div>
       <div class="legend">
         <span><i style="background:#0B0B0C"></i>To check</span>
         <span><i style="background:#E2330A"></i>Next up</span>
         <span><i style="background:#0E6FD8"></i>You</span>
+      </div>
+      <div class="maprow">
+        <button class="mini" id="setpos-btn">Set my position</button>
       </div>
     </section>
 
@@ -605,6 +626,8 @@ let geoTried = false;    // user has pressed "turn on location" at least once
 let permState = null;    // what navigator.permissions reports, when supported
 let lastGeoErr = null;   // {code, message, ms} of the most recent failure
 let triedCoarse = false; // fell back to a coarse fix after a high-accuracy miss
+let meManual = false;    // position was dropped by hand, not by the GPS
+let setPos = false;      // map is armed to accept a tap as "I am here"
 
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -727,6 +750,23 @@ function initCompass(){
    "click the padlock" advice sends people looking for something absent. */
 function geoHelp(){
   const instant = lastGeoErr && lastGeoErr.code === 1 && lastGeoErr.ms < 1000;
+  // Safari reporting the permission as granted while refusing the call is a
+  // browser-side contradiction. Nothing in these settings will fix it, so say
+  // that rather than sending someone round the settings app again.
+  if (permState === 'granted' && lastGeoErr && lastGeoErr.code === 1){
+    return `<b>Safari is contradicting itself here.</b>
+      It reports permission as <b>granted</b>, then refuses the request
+      ${lastGeoErr.ms}ms later. That's a browser fault, not a setting you got wrong,
+      and no permission toggle will clear it.
+      <ol>
+        <li>Worth one try: fully close this tab and Safari (swipe it away from
+            the app switcher), then reopen. This clears the stuck state on some
+            iOS builds.</li>
+        <li>Otherwise use <b>Drop my position on the map</b> above — everything
+            else in the app works normally from a hand-placed position.</li>
+      </ol>
+      <p class="diag">${diagLine()}</p>`;
+  }
   const body = IS_IOS ? `
     ${instant ? `<b>Safari has a saved "Don't Allow" for this site.</b>
       It won't ask again until you clear it — asking on load can't override that.` : ''}
@@ -752,12 +792,14 @@ function geoHelp(){
 /* Exact state, so a problem on a phone we can't inspect stops being guesswork */
 function diagLine(){
   const codes = { 1:'1 denied', 2:'2 unavailable', 3:'3 timeout' };
-  return [
+  const line = [
     'perm: ' + (permState || 'unknown'),
     'err: ' + (lastGeoErr ? (codes[lastGeoErr.code] || lastGeoErr.code) + ' in ' + lastGeoErr.ms + 'ms' : 'none'),
     'secure: ' + (window.isSecureContext ? 'yes' : 'NO'),
     'coarse tried: ' + (triedCoarse ? 'yes' : 'no')
   ].join(' · ');
+  const msg = lastGeoErr && lastGeoErr.message ? '<br>said: “' + lastGeoErr.message + '”' : '';
+  return line + msg;
 }
 
 /* rotate without spinning the long way round */
@@ -805,7 +847,7 @@ function renderWalk(){
     dock.hidden = true; return;
   }
 
-  const known = geo === 'on' && me;
+  const known = !!me;                 // GPS fix or a position dropped by hand
   const ft = known ? feet(me, t) : null;
   const arrived = known && ft <= ARRIVE_FT;
   const canMark = arrived || override || !known;
@@ -826,9 +868,11 @@ function renderWalk(){
     readout = `
       <div class="banner${geo === 'locating' ? '' : ' bad'}">
         <span class="bmsg">${geo === 'locating' ? '<span class="spin">◍</span> ' : '⚠ '}${label}</span>
-        ${canRetry ? `<button class="bbtn" id="enable-geo">Turn on</button>` : ''}
-        ${canRetry ? `<button class="linkish bhelp" id="toggle-help">${showHelp ? 'hide' : 'how'}</button>` : ''}
+        ${canRetry ? `<button class="bbtn" id="enable-geo">Retry</button>` : ''}
+        ${canRetry ? `<button class="linkish bhelp" id="toggle-help">${showHelp ? 'hide' : 'why'}</button>` : ''}
       </div>
+      ${canRetry ? `<button class="bigbtn" id="go-setpos">Drop my position on the map</button>
+        <p class="distunit" style="margin-bottom:1.2rem">then distances and sorting work as normal</p>` : ''}
       ${showHelp && canRetry ? `<div class="help">${geoHelp()}</div>` : ''}`;
   } else if (arrived){
     readout = `<p class="arrivedbig">You're here</p>
@@ -848,6 +892,14 @@ function renderWalk(){
   let hint = '';
   if (!known)
     hint = `Sorted from ${HOME.label} — mark by eye until location works.`;
+  else if (meManual)
+    hint = (arrived
+        ? `<b>Look at the parkway strip.</b>`
+        : `Get within ${ARRIVE_FT} ft to check in ·
+           <button class="linkish" id="override">Mark from here</button>`)
+      + `<br>Position set by hand ·
+         <button class="linkish" id="go-setpos">move it</button> ·
+         <button class="linkish" id="clear-manual">clear</button>`;
   else if (arrived)
     hint = `<b>Look at the parkway strip.</b>`;
   else if (compass === 'ask')
@@ -895,6 +947,14 @@ function ensureMap(){
     attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
+  // When armed, a tap on the map is "I am standing here" — the way to use
+  // this app at all when the browser will not hand over a GPS fix.
+  map.on('click', e => {
+    if (!setPos) return;
+    me = { lat:e.latlng.lat, lng:e.latlng.lng };
+    accuracy = null; meManual = true; setPos = false;
+    tab = 'walk'; applyTab();
+  });
 }
 
 function renderMap(){
@@ -992,6 +1052,15 @@ function applyTab(){
   $('#savedscreen').hidden = tab !== 'saved';
   $('#dock').hidden        = tab !== 'walk';
 
+  const tip = $('#maptip'), btn = $('#setpos-btn');
+  if (tip){
+    tip.hidden = !setPos;
+    tip.innerHTML = `Tap the map where you're standing ·
+      <button class="linkish" id="cancel-setpos">cancel</button>`;
+  }
+  if (btn) btn.textContent = meManual ? 'Move my position' : 'Set my position';
+  const mapEl = $('#map'); if (mapEl) mapEl.classList.toggle('arming', setPos);
+
   document.querySelectorAll('.tab[data-tab]').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
 
@@ -1032,10 +1101,40 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#unskip')){ skipped.clear(); renderWalk(); return; }
   if (e.target.closest('#unpick')){ picked = null; renderWalk(); return; }
   if (e.target.closest('#override')){ override = true; renderWalk(); return; }
-  if (e.target.closest('#enable-geo')){ geoTried = true; startGeo(); return; }
+  if (e.target.closest('#enable-geo')){
+    geoTried = true;
+    // Called with nothing awaited before it, so this still counts as a user
+    // gesture. Some iOS builds refuse watchPosition but honour this one.
+    try{
+      const t0 = Date.now();
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          me = { lat:pos.coords.latitude, lng:pos.coords.longitude };
+          accuracy = pos.coords.accuracy; meManual = false;
+          geo = 'on'; lastGeoErr = null;
+          startGeo();
+        },
+        err => {
+          lastGeoErr = { code:err.code, message:err.message||'', ms:Date.now()-t0 };
+          if (err.code === 1) showHelp = true;
+          startGeo();
+        },
+        { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+      );
+    }catch(e){ startGeo(); }
+    return;
+  }
   if (e.target.closest('#toggle-help')){ showHelp = !showHelp; renderWalk(); return; }
+  if (e.target.closest('#go-setpos')){
+    setPos = true; tab = 'map'; applyTab(); return;
+  }
+  if (e.target.closest('#clear-manual')){
+    meManual = false; me = null; setPos = false; renderWalk(); return;
+  }
+  if (e.target.closest('#cancel-setpos')){ setPos = false; applyTab(); return; }
   if (e.target.closest('#ask-compass')){ startCompass(); return; }
   if (e.target.closest('#moresaved')){ shownSaved += PAGE; renderSaved(); return; }
+  if (e.target.closest('#setpos-btn')){ setPos = true; applyTab(); return; }
 
   const mk = e.target.closest('[data-mark]');
   if (mk){
