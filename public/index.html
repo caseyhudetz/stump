@@ -37,6 +37,9 @@ body{
 .app{min-height:100dvh;display:flex;flex-direction:column;max-width:620px;margin:0 auto}
 .topbar{padding:calc(env(safe-area-inset-top) + .9rem) 1.1rem .7rem;border-bottom:1px solid var(--line)}
 .brandrow{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:flex;align-items:center;gap:.45rem;color:inherit;text-decoration:none;cursor:pointer}
+.brand:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:2px}
+.brand svg{width:1.15rem;height:1.15rem;display:block;flex:none}
 .mark{
   font-variation-settings:'wdth' 62,'wght' 800;
   font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase;line-height:1;margin:0;
@@ -277,7 +280,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 <div class="app">
   <div class="topbar">
     <div class="brandrow">
-      <h1 class="mark">Stump</h1>
+      <a class="brand" id="home" href="/" aria-label="Stump — all sites">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 5 L27 29 L16 23 L5 29 Z" fill="currentColor"/>
+        </svg>
+        <h1 class="mark">Stump</h1>
+      </a>
       <span class="hdr">
         <span class="sync" id="sync"></span>
         <button class="iconbtn" id="tasksbtn" hidden aria-label="Filing tasks">
@@ -847,6 +855,14 @@ function repaint(){
    EVENTS
    ============================================================ */
 document.addEventListener('click', async e => {
+  // the wordmark is a real link to "/", but in-app it just goes back to the
+  // list — a reload would re-query 311 for a screen we already have.
+  const home = e.target.closest('#home');
+  if (home && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0){
+    e.preventDefault();
+    tab = 'browse'; detailId = null; closeSort(); repaint(); window.scrollTo(0,0); return;
+  }
+
   if (e.target.closest('#tasksbtn')){
     tab = 'tasks'; detailId = null; closeSort(); repaint(); return;
   }
