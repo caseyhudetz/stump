@@ -55,6 +55,12 @@ body{
   font-family:'IBM Plex Mono',monospace;font-size:.68rem;
   text-transform:uppercase;letter-spacing:.1em;color:var(--dim);
 }
+.statuses{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem}
+.sync{
+  font-family:'IBM Plex Mono',monospace;font-size:.58rem;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--dim);opacity:.75;
+}
+.sync.warn{color:var(--hot);opacity:1}
 .tabs{display:flex;gap:.35rem;margin-top:.75rem}
 .tab{
   font-family:'IBM Plex Mono',monospace;font-size:.66rem;
@@ -254,7 +260,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   <div class="topbar">
     <div class="brandrow">
       <h1 class="mark">Stump</h1>
-      <span class="left" id="leftcount">—</span>
+      <span class="statuses">
+        <span class="left" id="leftcount">—</span>
+        <span class="sync" id="sync"></span>
+      </span>
     </div>
     <div class="tabs" id="tabs" hidden>
       <button class="tab" data-tab="walk" aria-pressed="true">Walk</button>
@@ -286,7 +295,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         Data: Chicago 311 service requests, queried live from the city open data portal.
         A site appears when a Tree Removal Inspection closed as Completed in the last six
         months and no Tree Planting Request has been filed at that address since.<br>
-        Your marks are stored on this device only.<br>
+        <span id="storagenote">Your marks are stored on this device.</span><br>
         <span id="stamp"></span>
       </p>
     </section>
@@ -335,8 +344,97 @@ const Store = {
 };
 let marks = {};   // sr_number -> { state:'open'|'none'|'tree'|'req', at:ISO }
 
+/* ============================================================
+   SYNC  — marks live in KV behind /api/marks so a check-in on the
+   phone shows up on the desktop later. Falls back to device-only
+   storage whenever the API isn't reachable or isn't configured.
+   ============================================================ */
+const SYNC_URL = '/api/marks';
+let sync = 'idle';        // idle | on | off | saving | offline
+let dirty = false;        // local edits not yet accepted by the server
+
+/* last write wins per site, same rule the Worker applies */
+function mergeMarks(base, incoming){
+  const out = { ...base };
+  for (const id of Object.keys(incoming || {})){
+    const next = incoming[id];
+    if (!next || typeof next.state !== 'string') continue;
+    const cur = out[id];
+    if (!cur || !cur.at || (next.at && next.at > cur.at)) out[id] = next;
+  }
+  return out;
+}
+
+function paintSync(){
+  const el = $('#sync');
+  if (el){
+    el.textContent = {
+      on:'synced', saving:'saving…', offline:'saved on device', off:'', idle:''
+    }[sync] || '';
+    el.className = 'sync' + (sync === 'offline' ? ' warn' : '');
+  }
+  const note = $('#storagenote');
+  if (note) note.textContent = sync === 'off'
+    ? 'Your marks are stored on this device only.'
+    : 'Your marks sync across your devices.';
+}
+
 async function saveMarks(){
   await Store.set('stump.marks', JSON.stringify(marks));
+  dirty = true;
+  await pushMarks();
+}
+
+async function pushMarks(){
+  if (sync === 'off') return;
+  sync = 'saving'; paintSync();
+  try{
+    const r = await fetch(SYNC_URL, {
+      method:'PUT',
+      headers:{ 'content-type':'application/json' },
+      body: JSON.stringify({ marks }),
+      cache:'no-store'
+    });
+    if (r.status === 503){ sync = 'off'; paintSync(); return; }
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    marks = mergeMarks(marks, j.marks || {});
+    await Store.set('stump.marks', JSON.stringify(marks));
+    dirty = false; sync = 'on';
+  }catch(e){
+    sync = 'offline';           // keep the local copy; retry on the next tick
+  }
+  paintSync();
+}
+
+async function pullMarks({ quiet = false } = {}){
+  if (sync === 'off') return false;
+  try{
+    const r = await fetch(SYNC_URL, { cache:'no-store' });
+    if (r.status === 503){ sync = 'off'; paintSync(); return false; }
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    const before = JSON.stringify(marks);
+    marks = mergeMarks(marks, j.marks || {});
+    sync = 'on'; paintSync();
+    if (JSON.stringify(marks) !== before){
+      await Store.set('stump.marks', JSON.stringify(marks));
+      if (!quiet) applyTab();
+      return true;
+    }
+  }catch(e){
+    sync = 'offline'; paintSync();
+  }
+  return false;
+}
+
+/* pick up edits made on the other device */
+function watchForRemoteEdits(){
+  setInterval(() => { if (!document.hidden) pullMarks(); }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden){ if (dirty) pushMarks(); else pullMarks(); }
+  });
+  window.addEventListener('online', () => { dirty ? pushMarks() : pullMarks(); });
 }
 
 /* ============================================================
@@ -906,6 +1004,11 @@ function fallbackCopy(text, done){
     const saved = await Store.get('stump.marks');
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
+
+  // fold in whatever the other device recorded, then publish anything only we have
+  await pullMarks({ quiet:true });
+  if (Object.keys(marks).length) await pushMarks();
+  watchForRemoteEdits();
 
   try{
     SITES = await loadSites();
