@@ -67,6 +67,7 @@ header{
 .count span{font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--stone)}
 .count.act b{color:var(--paint)}
 .count.done b{color:var(--leaf)}
+.count[data-jump]{cursor:pointer}
 
 /* ---------- controls ---------- */
 .bar{display:flex;gap:.4rem;padding:.7rem 0;flex-wrap:wrap;align-items:center}
@@ -79,11 +80,40 @@ header{
 }
 .chip[aria-pressed="true"]{background:var(--bark);color:var(--concrete);border-color:var(--bark)}
 .chip:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
-.barlabel{
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--stone);
-  width:100%;margin-bottom:-.2rem;
+
+/* ---------- queue (walking) view ---------- */
+.locline{
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
+  padding:.7rem 0 0;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
 }
+.locline button{
+  font:inherit;color:var(--sky);background:none;border:none;cursor:pointer;
+  text-decoration:underline;padding:0;text-transform:uppercase;letter-spacing:.06em;
+}
+.focus{margin-top:.7rem;padding:1.3rem 1.1rem 1.2rem}
+.focus .addr{font-size:1.7rem}
+.walklink{
+  display:inline-block;margin-top:.65rem;font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--sky);
+  text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px;
+}
+.upnext{
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--stone);
+  text-align:center;padding:.8rem 0;
+}
+
+/* ---------- sticky bottom dock ---------- */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  max-width:640px;margin:0 auto;
+  display:flex;gap:.5rem;align-items:stretch;
+  padding:.6rem 1rem calc(.6rem + env(safe-area-inset-bottom));
+  background:var(--concrete);border-top:1px solid var(--rule);
+  box-shadow:0 -4px 12px rgba(0,0,0,.05);
+}
+.dock .btn{min-height:3.1rem;font-size:.92rem}
+.dock .dockskip{flex:0 0 auto;padding:0 .8rem;border-color:transparent;color:var(--stone)}
+body.has-dock{padding-bottom:6.5rem}
 
 /* ---------- site card ---------- */
 .card{
@@ -225,40 +255,40 @@ footer a{color:var(--sky)}
   <div class="wrap">
     <div class="counts">
       <div class="count"><b id="c-open">—</b><span>To check</span></div>
-      <div class="count act"><b id="c-none">—</b><span>No tree</span></div>
-      <div class="count done"><b id="c-req">—</b><span>Requested</span></div>
+      <div class="count act" id="jump-none" data-jump="none"><b id="c-none">—</b><span>No tree</span></div>
+      <div class="count done" id="jump-req" data-jump="req"><b id="c-req">—</b><span>Requested</span></div>
     </div>
   </div>
 </header>
 
 <main class="wrap">
   <div class="bar" id="bar" hidden>
-    <span class="barlabel">View</span>
-    <button class="chip" data-mode="list" aria-pressed="true">List</button>
+    <button class="chip" data-mode="queue" aria-pressed="true">Queue</button>
     <button class="chip" data-mode="map" aria-pressed="false">Map</button>
-    <span class="barlabel">Show</span>
-    <button class="chip" data-view="open" aria-pressed="true">To check</button>
-    <button class="chip" data-view="none" aria-pressed="false">No tree</button>
-    <button class="chip" data-view="req" aria-pressed="false">Requested</button>
-    <button class="chip" data-view="tree" aria-pressed="false">Has tree</button>
-    <span class="barlabel">Sort</span>
-    <button class="chip" data-sort="home" aria-pressed="true">Nearest home</button>
-    <button class="chip" data-sort="me" aria-pressed="false">Nearest me</button>
-    <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
+    <button class="chip" data-mode="reviewed" aria-pressed="false">Reviewed</button>
   </div>
 
-  <div id="list"></div>
-  <button class="btn quiet more" id="more" hidden>Show 5 more</button>
+  <div id="queueview" hidden>
+    <p class="locline" id="locline"></p>
+    <div id="focus"></div>
+  </div>
 
   <div id="mapview" hidden>
     <div id="map"></div>
     <div class="maplegend">
       <span><i style="background:#75726A"></i>To check</span>
-      <span><i style="background:#DE4B12"></i>No tree</span>
-      <span><i style="background:#2F6B45"></i>Requested</span>
-      <span><i style="background:#B8B6AE"></i>Has tree</span>
       <span><i style="background:#1E5A78"></i>Home</span>
     </div>
+  </div>
+
+  <div id="reviewedview" hidden>
+    <div class="bar" id="reviewedTabs">
+      <button class="chip" data-rtab="none" aria-pressed="true">No tree</button>
+      <button class="chip" data-rtab="req" aria-pressed="false">Requested</button>
+      <button class="chip" data-rtab="tree" aria-pressed="false">Has tree</button>
+    </div>
+    <div id="rlist"></div>
+    <button class="btn quiet more" id="moreR" hidden>Show 5 more</button>
   </div>
 
   <footer>
@@ -269,6 +299,8 @@ footer a{color:var(--sky)}
     <span id="stamp"></span>
   </footer>
 </main>
+
+<div class="dock" id="dock" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -460,47 +492,99 @@ function packetText(s){
 /* ============================================================
    RENDER
    ============================================================ */
-let SITES = [], view = 'open', sort = 'home', mode = 'list', shown = PAGE, me = null;
+let SITES = [], mode = 'queue', rtab = 'none', shownR = PAGE, skipped = new Set();
+let me = null, geoState = 'idle', geoWatchId = null;
 const STATE_COLOR = {open:'#75726A', none:'#DE4B12', tree:'#B8B6AE', req:'#2F6B45'};
 let map = null, markerLayer = null;
 
 function stateOf(s){ return (marks[s.id] && marks[s.id].state) || 'open'; }
+function origin(){ return me || HOME; }
 
-function visible(){
-  let list = SITES.filter(s => stateOf(s) === view);
-  const origin = (sort === 'me' && me) ? me : HOME;
-  if (sort === 'new') list.sort((a,b) => b.closed.localeCompare(a.closed));
-  else list.sort((a,b) => miles(origin,a) - miles(origin,b));
-  return list;
+function toCheckList(){
+  return SITES.filter(s => stateOf(s) === 'open' && !skipped.has(s.id))
+    .sort((a,b) => miles(origin(),a) - miles(origin(),b));
 }
 
-function render(){
-  const list = visible();
-  const el = $('#list');
-
+function updateCounts(){
   $('#c-open').textContent = SITES.filter(s=>stateOf(s)==='open').length;
   $('#c-none').textContent = SITES.filter(s=>stateOf(s)==='none').length;
   $('#c-req').textContent  = SITES.filter(s=>stateOf(s)==='req').length;
+}
+
+/* ---------- queue (walking) view ---------- */
+function renderLocline(){
+  const el = $('#locline');
+  if (geoState === 'granted') el.innerHTML = `Sorted by <b>your live location</b>`;
+  else if (geoState === 'locating') el.innerHTML = `Finding you… sorted from ${HOME.label} for now`;
+  else if (geoState === 'denied') el.innerHTML = `Location off — sorted from ${HOME.label} <button id="retry-loc">Try again</button>`;
+  else if (geoState === 'unsupported') el.innerHTML = `Sorted from ${HOME.label}`;
+  else el.innerHTML = `Sorted from ${HOME.label} <button id="retry-loc">Use my location</button>`;
+}
+
+function renderQueue(){
+  renderLocline();
+  const list = toCheckList();
+  const el = $('#focus');
 
   if (!list.length){
-    const empty = {
-      open:'Nothing left to check.<br>New removals appear here as the city closes them.',
-      none:'No confirmed gaps yet.<br>Check a site and mark it if the parkway is empty.',
-      req:'Nothing filed yet.<br>Sites you submit to 311 land here.',
-      tree:'No sites marked as still having a tree.'
-    }[view];
-    el.innerHTML = `<p class="msg">${empty}</p>`;
-    $('#more').hidden = true;
+    el.innerHTML = `<p class="msg"><b>You're all caught up.</b>Nothing left to check right now.<br>New removals appear here as the city closes them.</p>`;
+    $('#dock').hidden = true;
+    document.body.classList.remove('has-dock');
     return;
   }
 
-  const origin = (sort === 'me' && me) ? me : HOME;
-  const originName = (sort === 'me' && me) ? 'you' : HOME.label;
+  const s = list[0];
+  const o = origin();
+  const d = miles(o, s);
+  const walk = Math.max(1, Math.round(d * 20));
 
-  el.innerHTML = list.slice(0, shown).map(s => {
+  el.innerHTML = `
+    <article class="card focus s-open">
+      <div class="chead">
+        ${glyph('open')}
+        <div class="cmain">
+          <h2 class="addr">${s.address}</h2>
+          <p class="meta">
+            <span class="far">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'}</span>
+            ${me ? 'from you' : 'from home'}<span class="dot">·</span>~${walk} min walk<br>
+            Removal closed ${ago(s.closed)}<span class="dot">·</span>${longDate(s.closed)}
+          </p>
+          <a class="walklink" target="_blank" rel="noopener"
+             href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there →</a>
+        </div>
+      </div>
+    </article>
+    ${list.length > 1 ? `<p class="upnext">${list.length - 1} more nearby after this one</p>` : ''}
+  `;
+
+  $('#dock').hidden = false;
+  document.body.classList.add('has-dock');
+  $('#dock').innerHTML = `
+    <button class="btn quiet dockskip" data-skip="${s.id}">Skip</button>
+    <button class="btn quiet" data-mark="${s.id}::tree">Tree's there</button>
+    <button class="btn act" data-mark="${s.id}::none">No tree</button>
+  `;
+}
+
+/* ---------- reviewed view ---------- */
+function renderReviewed(){
+  const list = SITES.filter(s => stateOf(s) === rtab).sort((a,b) => miles(HOME,a) - miles(HOME,b));
+  const el = $('#rlist');
+
+  if (!list.length){
+    const empty = {
+      none:'No confirmed gaps yet.<br>Sites you mark "No tree" in the queue land here, ready to file.',
+      req:'Nothing filed yet.<br>Sites you submit to 311 land here.',
+      tree:'No sites marked as still having a tree.'
+    }[rtab];
+    el.innerHTML = `<p class="msg">${empty}</p>`;
+    $('#moreR').hidden = true;
+    return;
+  }
+
+  el.innerHTML = list.slice(0, shownR).map(s => {
     const st = stateOf(s);
-    const d = miles(origin, s);
-    const walk = Math.max(1, Math.round(d * 20));
+    const d = miles(HOME, s);
     const p = packet(s);
 
     const fields = Object.keys(p).map((k,i) => `
@@ -513,13 +597,7 @@ function render(){
       </div>`).join('');
 
     let acts = '';
-    if (st === 'open'){
-      acts = `
-        <a class="btn link" target="_blank" rel="noopener"
-           href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there</a>
-        <button class="btn solid" data-mark="${s.id}::none">No tree</button>
-        <button class="btn quiet" data-mark="${s.id}::tree">Tree's there</button>`;
-    } else if (st === 'none'){
+    if (st === 'none'){
       acts = `
         <a class="btn act" target="_blank" rel="noopener"
            href="https://www.chicago.gov/city/en/depts/streets/provdrs/forestry/svcs/tree_planting.html">Open 311 form</a>
@@ -537,7 +615,7 @@ function render(){
           <h2 class="addr">${s.address}</h2>
           <p class="meta">
             <span class="far">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'}</span>
-            from ${originName}<span class="dot">·</span>~${walk} min walk<br>
+            from ${HOME.label}<span class="dot">·</span>
             Removal closed ${ago(s.closed)}<span class="dot">·</span>${longDate(s.closed)}<br>
             ${s.id}
           </p>
@@ -556,8 +634,8 @@ function render(){
     </article>`;
   }).join('');
 
-  $('#more').hidden = mode === 'map' || list.length <= shown;
-  $('#more').textContent = `Show ${Math.min(PAGE, list.length - shown)} more`;
+  $('#moreR').hidden = list.length <= shownR;
+  $('#moreR').textContent = `Show ${Math.min(PAGE, list.length - shownR)} more`;
 }
 
 /* ---------- map view ---------- */
@@ -575,35 +653,29 @@ function renderMap(){
   if (!map) return;
   markerLayer.clearLayers();
 
-  const list = visible();
-  const origin = (sort === 'me' && me) ? me : HOME;
-  const points = [[origin.lat ?? HOME.lat, origin.lng ?? HOME.lng]];
+  const list = toCheckList();
+  const o = origin();
+  const points = [[o.lat, o.lng]];
 
   L.circleMarker([HOME.lat, HOME.lng], {
     radius: 8, weight: 2, color: '#fff', fillColor: '#1E5A78', fillOpacity: 1
   }).addTo(markerLayer).bindPopup(`<b>Home</b><span class="pmeta">${HOME.label}</span>`);
 
   list.forEach(s => {
-    const st = stateOf(s);
-    const d = miles(origin, s);
+    const d = miles(o, s);
     const marker = L.circleMarker([s.lat, s.lng], {
-      radius: 8, weight: 2, color: '#fff', fillColor: STATE_COLOR[st], fillOpacity: 1
+      radius: 8, weight: 2, color: '#fff', fillColor: STATE_COLOR.open, fillOpacity: 1
     }).addTo(markerLayer);
-
-    let acts = '';
-    if (st === 'open'){
-      acts = `
-        <a class="btn link" target="_blank" rel="noopener"
-           href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there</a>
-        <button class="btn solid" data-mark="${s.id}::none">No tree</button>`;
-    } else if (st === 'none'){
-      acts = `<button class="btn solid" data-mark="${s.id}::req">Mark as filed</button>`;
-    }
 
     marker.bindPopup(`
       <b>${s.address}</b>
       <span class="pmeta">${d < 0.1 ? (Math.round(d*5280))+' ft' : d.toFixed(2)+' mi'} away &middot; closed ${ago(s.closed)}</span>
-      ${acts ? `<div class="popact">${acts}</div>` : ''}
+      <div class="popact">
+        <a class="btn link" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Walk there</a>
+        <button class="btn solid" data-mark="${s.id}::none">No tree</button>
+        <button class="btn quiet" data-mark="${s.id}::tree">Tree's there</button>
+      </div>
     `);
     points.push([s.lat, s.lng]);
   });
@@ -612,22 +684,56 @@ function renderMap(){
   else map.setView(points[0], 15);
 }
 
-function syncMode(){
-  $('#list').hidden = mode === 'map';
+/* ---------- mode / toolbar ---------- */
+function syncToolbarUI(){
+  document.querySelectorAll('.chip[data-mode]').forEach(c =>
+    c.setAttribute('aria-pressed', String(c.dataset.mode === mode)));
+  document.querySelectorAll('.chip[data-rtab]').forEach(c =>
+    c.setAttribute('aria-pressed', String(c.dataset.rtab === rtab)));
+}
+
+function applyMode(){
+  $('#queueview').hidden = mode !== 'queue';
   $('#mapview').hidden = mode !== 'map';
+  $('#reviewedview').hidden = mode !== 'reviewed';
+  if (mode !== 'queue'){ $('#dock').hidden = true; document.body.classList.remove('has-dock'); }
+
   if (mode === 'map'){
-    $('#more').hidden = true;
     ensureMap();
     renderMap();
     requestAnimationFrame(() => map.invalidateSize());
-  } else {
-    render();
+  } else if (mode === 'queue'){
+    renderQueue();
+  } else if (mode === 'reviewed'){
+    renderReviewed();
   }
 }
 
 function refresh(){
-  render();
+  updateCounts();
+  if (mode === 'queue') renderQueue();
+  else if (mode === 'reviewed') renderReviewed();
   if (mode === 'map') renderMap();
+}
+
+/* ---------- live location ---------- */
+function startLocating(){
+  if (!navigator.geolocation){ geoState = 'unsupported'; renderLocline(); return; }
+  geoState = 'locating'; renderLocline();
+  if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      geoState = 'granted';
+      if (mode === 'queue') renderQueue();
+      if (mode === 'map') renderMap();
+    },
+    () => {
+      me = null; geoState = 'denied';
+      if (mode === 'queue') renderQueue();
+    },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 }
+  );
 }
 
 /* ============================================================
@@ -636,31 +742,34 @@ function refresh(){
 document.addEventListener('click', async e => {
   const chip = e.target.closest('.chip');
   if (chip){
-    const group = chip.dataset.mode ? 'mode' : chip.dataset.view ? 'view' : 'sort';
+    const group = chip.dataset.mode ? 'mode' : 'rtab';
     document.querySelectorAll(`.chip[data-${group}]`).forEach(c => c.setAttribute('aria-pressed','false'));
     chip.setAttribute('aria-pressed','true');
-    if (group === 'mode'){ mode = chip.dataset.mode; syncMode(); return; }
-    if (group === 'view'){ view = chip.dataset.view; shown = PAGE; }
-    else {
-      sort = chip.dataset.sort;
-      if (sort === 'me' && !me && navigator.geolocation){
-        navigator.geolocation.getCurrentPosition(
-          pos => { me = {lat:pos.coords.latitude, lng:pos.coords.longitude}; refresh(); },
-          ()  => { me = null; refresh(); },
-          {enableHighAccuracy:true, timeout:8000}
-        );
-      }
-    }
-    refresh(); return;
+    if (group === 'mode'){ mode = chip.dataset.mode; applyMode(); }
+    else { rtab = chip.dataset.rtab; shownR = PAGE; renderReviewed(); }
+    return;
   }
+
+  const jump = e.target.closest('[data-jump]');
+  if (jump){
+    mode = 'reviewed'; rtab = jump.dataset.jump; shownR = PAGE;
+    syncToolbarUI(); applyMode(); return;
+  }
+
+  const retry = e.target.closest('#retry-loc');
+  if (retry){ startLocating(); return; }
+
+  const skip = e.target.closest('[data-skip]');
+  if (skip){ skipped.add(skip.dataset.skip); renderQueue(); return; }
 
   const mark = e.target.closest('[data-mark]');
   if (mark){
     const [id, state] = mark.dataset.mark.split('::');
     if (state === 'open') delete marks[id];
     else marks[id] = { state, at:new Date().toISOString() };
+    skipped.delete(id);
     await Store.set('stump.marks', JSON.stringify(marks));
-    if (mode === 'map') map.closePopup();
+    if (mode === 'map' && map) map.closePopup();
     refresh(); return;
   }
 
@@ -678,7 +787,7 @@ document.addEventListener('click', async e => {
     copy(packetText(s), all, 'Copied'); return;
   }
 
-  if (e.target.id === 'more'){ shown += PAGE; render(); }
+  if (e.target.id === 'moreR'){ shownR += PAGE; renderReviewed(); }
 });
 
 function copy(text, btn, label){
@@ -704,7 +813,10 @@ function fallback(text, done){
    BOOT
    ============================================================ */
 (async function init(){
-  $('#list').innerHTML = `<p class="msg"><span class="spin">◌</span><br>Reading Chicago 311…</p>`;
+  $('#queueview').hidden = false;
+  $('#focus').innerHTML = `<p class="msg"><span class="spin">◌</span><br>Reading Chicago 311…</p>`;
+  startLocating();
+
   try{
     const saved = await Store.get('stump.marks');
     if (saved) marks = JSON.parse(saved);
@@ -716,9 +828,10 @@ function fallback(text, done){
     $('#stamp').textContent = 'Loaded ' + new Date().toLocaleString('en-US',
       {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) +
       ' · ' + SITES.length + ' sites with no follow-up planting request';
-    render();
+    updateCounts();
+    applyMode();
   }catch(err){
-    $('#list').innerHTML = `<p class="msg err"><b>Could not reach the city data portal.</b>
+    $('#focus').innerHTML = `<p class="msg err"><b>Could not reach the city data portal.</b>
       ${err.message}<br>Pull down to refresh, or try again in a minute.</p>`;
   }
 })();
