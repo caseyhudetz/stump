@@ -89,23 +89,18 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
 /* ---------- browse controls ---------- */
 .pane{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
-.pane > .scroller{flex:1}
-.controls{display:flex;gap:.4rem;align-items:stretch;margin-top:.7rem}
-/* the sheet drops from the icon that opened it */
-.pane .panel{flex:0 0 auto;margin:.9rem 1.1rem 0;box-shadow:0 8px 20px rgba(0,0,0,.07)}
-
-/* one floating control switches the view, the way a map app does it */
+.pane > .scroller{flex:1;padding-bottom:6rem}  /* clear the floating buttons */
+/* the view toggle is a corner icon, matching find-me on the other side */
 .viewpill{
-  position:absolute;left:50%;transform:translateX(-50%);
-  bottom:calc(1.1rem + env(safe-area-inset-bottom));z-index:900;
-  display:inline-flex;align-items:center;gap:.55rem;
-  padding:.85rem 1.35rem;border:0;border-radius:2rem;cursor:pointer;
+  position:absolute;left:1.4rem;z-index:900;
+  bottom:calc(1.4rem + env(safe-area-inset-bottom));
+  width:3.6rem;height:3.6rem;padding:.85rem;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:2px solid var(--ink);border-radius:50%;cursor:pointer;
   background:var(--ink);color:var(--paper);
-  font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 88,'wght' 700;
-  font-size:.92rem;letter-spacing:.01em;
-  box-shadow:0 4px 16px rgba(0,0,0,.28);
+  box-shadow:0 3px 12px rgba(0,0,0,.28);
 }
-.viewpill svg{width:1.1rem;height:1.1rem;flex:0 0 auto}
+.viewpill svg{width:100%;height:100%;display:block}
 .viewpill:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
 .search{
   flex:1;min-width:9rem;
@@ -188,8 +183,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   text-transform:uppercase;   /* buttons don't inherit this from the h1 */
 }
 .mark button:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
-/* search now sits in the header */
-.topbar .search{width:100%;margin-top:.7rem}
+/* the sheet hangs under the header; search lives inside it */
+.topbar .panel{margin-top:.8rem}
+.panel .search{width:100%;margin-bottom:.9rem}
+/* OSM's own tiles, desaturated so the pins are the only colour on screen */
+.leaflet-tile-pane{filter:grayscale(1) brightness(1.07) contrast(.86)}
 .legend span{display:inline-flex;align-items:center;gap:.35rem}
 .legend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
@@ -397,6 +395,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <h1 class="mark"><button id="home" aria-label="Back to all sites">Stump</button></h1>
       <span class="hdr">
         <span class="sync" id="sync"></span>
+        <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="dot" id="sortdot" hidden></span>
+        </button>
         <button class="iconbtn" id="tasksbtn" hidden aria-label="Filing tasks">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 4h8a1 1 0 0 1 1 1v15l-5-3-5 3V5a1 1 0 0 1 1-1z"
@@ -407,16 +412,23 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </button>
       </span>
     </div>
-    <div class="controls">
-      <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
-      <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span class="dot" id="sortdot" hidden></span>
-      </button>
-    </div>
+    <div class="panel" id="sortpanel" hidden>
+        <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
+        <p class="plabel">Order by</p>
+        <div class="prow">
+          <button class="chip" data-sort="street" aria-pressed="true">Street A–Z</button>
+          <button class="chip" data-sort="near" aria-pressed="false">Closest</button>
+          <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
+        </div>
+        <p class="plabel">Show</p>
+        <div class="prow">
+          <button class="chip" data-show="all" aria-pressed="true">All</button>
+          <button class="chip" data-show="open" aria-pressed="false">Unchecked</button>
+          <button class="chip" data-show="none" aria-pressed="false">No tree</button>
+          <button class="chip" data-show="req" aria-pressed="false">Filed</button>
+          <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
+        </div>
+      </div>
   </div>
 
   <main>
@@ -449,22 +461,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
       <button class="viewpill" id="viewpill"></button>
 
-      <div class="panel" id="sortpanel" hidden>
-        <p class="plabel">Order by</p>
-        <div class="prow">
-          <button class="chip" data-sort="street" aria-pressed="true">Street A–Z</button>
-          <button class="chip" data-sort="near" aria-pressed="false">Closest</button>
-          <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
-        </div>
-        <p class="plabel">Show</p>
-        <div class="prow">
-          <button class="chip" data-show="all" aria-pressed="true">All</button>
-          <button class="chip" data-show="open" aria-pressed="false">Unchecked</button>
-          <button class="chip" data-show="none" aria-pressed="false">No tree</button>
-          <button class="chip" data-show="req" aria-pressed="false">Filed</button>
-          <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
-        </div>
-      </div>
 
     </section>
 
@@ -500,10 +496,11 @@ const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
-// Positron: near-monochrome, so the pins are the only saturated thing on screen
-const TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const TILE_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · ' +
-                    '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+// OpenStreetMap's own tiles: no API key, no watermark, full zoom range.
+// The grey, minimal look comes from a CSS filter on the tile layer instead
+// of a styled provider, all of which now want a key.
+const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7gBEAS&language=en_US';
 
 const REMOVALS_SINCE = (() => {
@@ -891,8 +888,10 @@ const ICON_MAP = `<svg viewBox="0 0 24 24" aria-hidden="true">
 
 function paintPill(){
   const el = $('#viewpill'); if (!el) return;
-  el.innerHTML = view === 'map' ? ICON_LIST + 'Show list' : ICON_MAP + 'Show map';
+  el.innerHTML = view === 'map' ? ICON_LIST : ICON_MAP;
   el.setAttribute('aria-label', view === 'map' ? 'Show list' : 'Show map');
+  // nothing should float over the open sheet
+  el.hidden = !$('#sortpanel').hidden;
 }
 
 function ensureMap(){
@@ -1206,10 +1205,11 @@ document.addEventListener('click', async e => {
   }
 
   if (e.target.closest('#sortbtn')){
-    const p = $('#sortpanel');
-    const openNow = p.hidden;
-    p.hidden = !openNow;
+    const panel = $('#sortpanel');
+    const openNow = panel.hidden;
+    panel.hidden = !openNow;
     $('#sortbtn').setAttribute('aria-expanded', String(openNow));
+    paintPill();
     return;
   }
   // a tap anywhere else closes the panel, except inside it
@@ -1354,8 +1354,12 @@ document.addEventListener('input', e => {
 });
 
 function closeSort(){
-  const p = $('#sortpanel');
-  if (p && !p.hidden){ p.hidden = true; $('#sortbtn').setAttribute('aria-expanded','false'); }
+  const panel = $('#sortpanel');
+  if (panel && !panel.hidden){
+    panel.hidden = true;
+    $('#sortbtn').setAttribute('aria-expanded','false');
+    paintPill();
+  }
 }
 
 /* Share the whole survey, or one site to go and look at. */
