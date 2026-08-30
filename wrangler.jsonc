@@ -1,9 +1,9 @@
 {
-  // Renamed to move the app to a fresh origin. Safari had a stored location
-  // denial attached to the old stump.*.workers.dev hostname that could not be
-  // cleared from inside the page, and permission state is keyed by origin.
-  // Do not rename back: the old hostname would inherit the same stored denial.
-  "name": "stump-44",
+  // Must match the Worker this repo is connected to in Cloudflare. The Git
+  // integration deploys to that service, so renaming here does not create a
+  // new Worker — it just fails the build. A new hostname has to be made by
+  // connecting the repo to a new Worker in the dashboard.
+  "name": "stump",
   "compatibility_date": "2026-08-29",
   "main": "src/worker.js",
   "assets": {
