@@ -134,6 +134,47 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pill.req{background:var(--ok);border-color:var(--ok);color:#fff}
 .pill.tree{background:var(--wash)}
 .pill.plant{background:#C87A16;border-color:#C87A16;color:#fff}
+.pill.wait{background:#F5E4C8;border-color:#C87A16;color:#7A4A0E}
+.state.wait{background:#FDF6EC;border-left:4px solid #C87A16}
+
+/* the third answer: empty, but the city already has it */
+.chooser{
+  background:#FDF6EC;border-left:4px solid #C87A16;
+  padding:.85rem .9rem;margin:0 0 .2rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.65;
+}
+.chead{margin:0 0 .5rem;color:#8A5310;font-size:.63rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.07em}
+.chit{margin:0 0 .45rem;color:var(--dim)}
+.chit b{color:var(--ink);font-weight:600}
+.chit .late{color:#B3400A;font-weight:600}
+.cnote{margin:.55rem 0 0;color:var(--dim);padding-top:.5rem;border-top:1px solid rgba(200,122,22,.3)}
+.chooser .btnrow{margin-top:.7rem}
+.chooser .mini{min-height:2.7rem;font-size:.8rem}
+.ccancel{display:block;margin:.6rem auto 0;font-family:'IBM Plex Mono',monospace;
+  font-size:.62rem;color:var(--dim)}
+
+/* filed work: one line each, opened when you want it */
+.donehead{margin-top:1.8rem}
+.donelist{border-top:1px solid var(--line)}
+.donerow{border-bottom:1px solid var(--line)}
+.donerow summary{
+  display:flex;align-items:center;gap:.7rem;
+  padding:.7rem .2rem;cursor:pointer;list-style:none;
+}
+.donerow summary::-webkit-details-marker{display:none}
+.donerow .drmain{flex:1;min-width:0}
+.draddr{
+  display:block;font-variation-settings:'wdth' 80,'wght' 650;
+  font-size:.92rem;line-height:1.2;text-transform:uppercase;overflow-wrap:break-word;
+}
+.drmeta{display:block;font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  color:var(--dim);margin-top:.15rem}
+.drchev{color:var(--dim);flex:0 0 auto;font-size:1.05rem;transition:transform .18s}
+.donerow[open] .drchev{transform:rotate(90deg)}
+.drbody{padding:.2rem .2rem 1rem}
+.drbody .btnrow{margin-top:.7rem}
+.drbody .mini{min-height:2.5rem;font-size:.78rem;min-width:6rem}
 /* a request already open close by — the thing most likely to make a
    filing pointless, so it is said before the form is opened */
 .dupwarn{
@@ -240,6 +281,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pin.req {background:var(--ok)}
 .pin.tree{background:#B8B6AE;width:.8rem;height:.8rem;margin:.1rem;opacity:.85}
 .pin.plant{background:#C87A16}
+/* checked, empty, and already in the city's queue — amber, but ringed so
+   it reads apart from the request pins themselves */
+.pin.wait{background:#F0B44A;box-shadow:0 0 0 2px #C87A16,0 1px 3px rgba(11,11,12,.45)}
 .pin.me{background:#0E6FD8;box-shadow:0 0 0 3px rgba(14,111,216,.22),0 1px 3px rgba(11,11,12,.4)}
 .pin.big{width:1.25rem;height:1.25rem;margin:-.15rem;border-width:3px}
 /* the pit you are looking at, while its popup is open */
@@ -660,6 +704,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
           <button class="chip" data-show="none" aria-pressed="false">No tree</button>
           <button class="chip" data-show="req" aria-pressed="false">Filed</button>
           <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
+          <button class="chip" data-show="wait" aria-pressed="false">In queue</button>
           <button class="chip" data-show="plant" aria-pressed="false">Planting requested</button>
         </div>
         <div class="pfoot">
@@ -688,6 +733,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
           <span class="lsite"><i class="pin none"></i>No tree</span>
           <span class="lsite"><i class="pin req"></i>Filed</span>
           <span class="lsite"><i class="pin tree"></i>Has tree</span>
+          <span class="lsite"><i class="pin wait"></i>In queue</span>
           <span class="lplant"><i class="pin plant"></i>Requested, not planted</span>
           <span><i class="pin me"></i>You</span>
         </div>
@@ -952,7 +998,7 @@ async function loadSites(){
     ),
     soda(
       `ward=${WARD} AND sr_type='Tree Planting Request' AND created_date > '2023-01-01T00:00:00'`,
-      'sr_number,street_number,street_direction,street_name,street_type,latitude,longitude,created_date,status'
+      'sr_number,street_number,street_direction,street_name,street_type,latitude,longitude,created_date,closed_date,status'
     )
   ]);
 
@@ -1006,7 +1052,58 @@ async function loadSites(){
     }))
     .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
 
-  return { sites, confirmed, plants };
+  return { sites, confirmed, plants, stats: plantStats(plantings) };
+}
+
+/* ============================================================
+   HOW LONG THE WARD ACTUALLY WAITS
+   ============================================================
+   Whether to ask again for a tree someone has already asked for is a
+   judgement, and it needs two facts: how old this request is, and how long
+   requests here normally take. Both are in the data the app already pulls,
+   so it works them out rather than guessing at a rule.
+
+   The duplicate share is worth having too: a status vocabulary that
+   contains "Dup" is a system that merges repeat requests rather than
+   counting them. */
+function plantStats(rows){
+  const days = [];
+  let dup = 0;
+  for (const r of rows || []){
+    if (/dup/i.test(r.status || '')) dup++;
+    if (!/^completed/i.test(r.status || '') || /dup/i.test(r.status || '')) continue;
+    const a = Date.parse(r.created_date), b = Date.parse(r.closed_date);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) continue;
+    days.push((b - a) / 86400000);
+  }
+  days.sort((a,b) => a - b);
+  return {
+    n: days.length,
+    total: (rows || []).length,
+    dupShare: rows && rows.length ? dup / rows.length : 0,
+    median: days.length >= 8 ? days[Math.floor(days.length / 2)] : null
+  };
+}
+
+const humanDays = d =>
+  d < 45 ? `${Math.round(d)} days`
+  : d < 400 ? `${Math.round(d / 30.4)} months`
+  : `${(d / 365).toFixed(1)} years`;
+
+/* This request, measured against the ward's own record. */
+function requestAge(p){
+  const days = (Date.now() - Date.parse(p.at)) / 86400000;
+  const med = PLANT_STATS.median;
+  if (!Number.isFinite(days)) return { days:0, note:'' };
+  if (!med) return { days, note:`open ${humanDays(days)}` };
+  if (days > med * 2)
+    return { days, late:true,
+      note:`open ${humanDays(days)} — more than twice the ${humanDays(med)} this ward usually takes` };
+  if (days > med)
+    return { days, late:true,
+      note:`open ${humanDays(days)}, past the ${humanDays(med)} this ward usually takes` };
+  return { days,
+    note:`open ${humanDays(days)}; this ward usually plants within about ${humanDays(med)}` };
 }
 
 /* One removal row from the city, in the shape the app uses. */
@@ -1052,6 +1149,42 @@ function nearbyRequests(s){
       (s.streetKey && s.streetKey === p.streetKey && Math.abs((s.num||0) - p.num) <= DUP_NUMBERS))
     .sort((a,b) => a.ft - b.ft)
     .slice(0, 4);
+}
+
+/* A site parked as "in the queue" is only parked while that request is
+   still open. PLANTS holds open requests only, so when the one that
+   covered it disappears, either it was planted or it was closed without
+   being planted — and either way it wants another look. */
+function staleWait(s){
+  if (stateOf(s) !== 'wait' || nearbyRequests(s).length) return '';
+  return ` The request that covered this is no longer open — worth another look.`;
+}
+
+/* The pit is empty and the city already has a request for it. That is a
+   real outcome of a visit and neither of the two answers covers it, so it
+   gets its own one — and the choice is put next to the evidence rather
+   than left to memory. */
+function chooserBlock(s){
+  const hits = nearbyRequests(s);
+  if (!hits.length) return '';
+  const dupPct = Math.round(PLANT_STATS.dupShare * 100);
+  return `<div class="chooser">
+    <p class="chead">Empty — but a tree has already been asked for</p>
+    ${hits.slice(0,2).map(({p, ft}) => {
+      const a = requestAge(p);
+      return `<p class="chit"><b>${esc(p.address)}</b> · ${dist(ft / FT_PER_MI)} away<br>
+        <span class="${a.late ? 'late' : ''}">${esc(a.note)}</span></p>`;
+    }).join('')}
+    <p class="cnote">${dupPct >= 2
+      ? `${dupPct}% of this ward's planting requests are already marked duplicates, so a
+         second one is likely to be merged into the first rather than counted twice.`
+      : `A second request at the same address is normally merged into the first.`}</p>
+    <div class="btnrow">
+      <button class="mini fill" data-mark="${esc(s.id)}::wait">It's in the queue</button>
+      <button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>
+    </div>
+    <button class="linkish ccancel" data-choosecancel>Back</button>
+  </div>`;
 }
 
 /* Said in full where a request is about to be filed, and in one line
@@ -1139,8 +1272,11 @@ let dupLayer = null;      // open requests around the pit you are looking at
 let picked = null;        // the pin whose sheet is up
 let mapFramed = false;    // the opening view is set once, then the map is yours
 let noting = null;        // site id whose note is being written
+let choosing = null;      // site id being asked "already requested, or ask again?"
+let PLANT_STATS = { n:0, total:0, dupShare:0, median:null };
 let noteDraft = '';       // what is in the box, so a sync pull can't wipe it
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
+const doneOpen = new Set();   // which filed rows you have opened
 let miniView = null;       // {id, center, zoom} — keeps where you panned/zoomed to
 
 /* Location is an optional extra on the map, never something the app needs.
@@ -1284,7 +1420,8 @@ function filtered(){
   return list;
 }
 
-const PILL = { open:['',''], none:['none','No tree'], req:['req','Filed'], tree:['tree','Has tree'] };
+const PILL = { open:['',''], none:['none','No tree'], req:['req','Filed'],
+               tree:['tree','Has tree'], wait:['wait','In queue'] };
 
 /* Open planting requests, sorted and searched the same way. */
 function filteredPlants(){
@@ -1305,7 +1442,8 @@ function renderBrowse(){
   const list = plantView ? filteredPlants() : filtered();
   // the only place a count appears, and it tracks whatever is on screen
   const unchecked = plantView ? 0 : list.filter(s => stateOf(s) === 'open').length;
-  const LABEL = { open:'unchecked', none:'with no tree', req:'filed', tree:'with a tree' };
+  const LABEL = { open:'unchecked', none:'with no tree', req:'filed',
+                  tree:'with a tree', wait:'already in the queue' };
   $('#count').textContent = query
     ? `${list.length} match${list.length===1?'':'es'} for “${query}”`
     : plantView
@@ -1656,13 +1794,16 @@ function renderSheet(){
   const near = nearbyRequests(s);
   const [cls, label] = PILL[st];
 
-  const decision = st === 'open'
+  const decision = choosing === s.id ? chooserBlock(s)
+    : st === 'open'
     ? `<div class="choices sheetchoices">
          <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
-         <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+         <button class="act no" ${near.length ? `data-choose="${esc(s.id)}"`
+           : `data-mark="${esc(s.id)}::none"`}>No<br>tree</button>
        </div>`
     : `<div class="btnrow">
          ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>` : ''}
+         ${st === 'wait' ? `<button class="mini ghost" data-choose="${esc(s.id)}">Ask again?</button>` : ''}
          <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
        </div>`;
 
@@ -1961,17 +2102,24 @@ function renderDetail(){
     : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}${
         m && m.sr ? ` · <b>${esc(m.sr)}</b>` : ''}.</div>`
     : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
+    : st === 'wait' ? `<div class="state wait">Empty, and <b>already in the city's queue</b>
+        ${when?'as of '+ago(when):''}.${staleWait(s)}</div>`
     : '';
 
-  const choices = st === 'open' ? `
+  // "no tree" where a request is already open is a question, not an answer
+  const asksFirst = nearbyRequests(s).length > 0;
+  const choices = choosing === s.id ? chooserBlock(s)
+    : st === 'open' ? `
       <p class="ask">Is there a tree in the parkway?</p>
       <div class="choices">
         <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
-        <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+        <button class="act no" ${asksFirst ? `data-choose="${esc(s.id)}"`
+          : `data-mark="${esc(s.id)}::none"`}>No<br>tree</button>
       </div>`
     : `<div class="btnrow">
         ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to task</button>` : ''}
         ${st === 'req'  ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen task</button>` : ''}
+        ${st === 'wait' ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>` : ''}
         <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
       </div>`;
 
@@ -1999,7 +2147,7 @@ function renderDetail(){
 
     ${banner}
     ${cityLine(s)}
-    ${st === 'open' || st === 'none' ? dupWarning(s) : ''}
+    ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
     ${noteBlock(s.id)}
     <div class="mapbox">
       <div id="minimap"></div>
@@ -2159,10 +2307,42 @@ function renderTasks(){
     </article>`;
   };
 
+  /* Filed work is history: it should be countable at a glance and out of
+     the way, not a wall of cards between you and the next thing to do.
+     One line each, opened only when you want the detail. */
+  const doneRow = s => {
+    const m = marks[s.id] || {};
+    return `<details class="donerow"${doneOpen.has(s.id) ? ' open' : ''} data-done="${esc(s.id)}">
+      <summary>
+        <span class="drmain">
+          <span class="draddr">${esc(s.address)}</span>
+          <span class="drmeta">${m.sr ? esc(m.sr) : 'no number recorded'} · filed ${ago(m.at)}</span>
+        </span>
+        <span class="drchev">›</span>
+      </summary>
+      <div class="drbody">
+        <p class="tm">Removal ${esc(s.id)} closed ${longDate(s.closed)}${
+          m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>
+        ${cityLine(s)}
+        ${noteBlock(s.id)}
+        <div class="btnrow">
+          <button class="mini ghost" data-file="${esc(s.id)}">${m.sr ? 'Edit number' : 'Add number'}</button>
+          <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+          <button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen</button>
+        </div>
+        ${filing === s.id ? srForm(s) : ''}
+      </div>
+    </details>`;
+  };
+
   el.innerHTML = offBar + undoBar +
-    (todo.length ? `<p class="count">${todo.length} to file</p>` + todo.map(s => card(s,false)).join('') : '') +
-    (done.length ? `<p class="count" style="margin-top:1.5rem">${done.length} filed</p>` +
-                   done.map(s => card(s,true)).join('') : '');
+    (todo.length
+      ? `<p class="count">To do · ${todo.length} to file</p>` + todo.map(s => card(s,false)).join('')
+      : `<p class="count">To do · nothing waiting</p>`) +
+    (done.length
+      ? `<p class="count donehead">Done · ${done.length} filed</p>
+         <div class="donelist">${done.map(doneRow).join('')}</div>`
+      : '');
 }
 
 /* ============================================================
@@ -2312,6 +2492,18 @@ document.addEventListener('click', async e => {
   const goto = e.target.closest('[data-goto-task]');
   if (goto){ closeShot(); unpick(); tab = 'tasks'; detailId = null; repaint(); return; }
 
+  const ch = e.target.closest('[data-choose]');
+  if (ch){
+    choosing = ch.dataset.choose;
+    if (picked === choosing) renderSheet(); else repaint();
+    return;
+  }
+  if (e.target.closest('[data-choosecancel]')){
+    const was = choosing; choosing = null;
+    if (picked === was) renderSheet(); else repaint();
+    return;
+  }
+
   const nb = e.target.closest('[data-note]');
   if (nb){
     noting = nb.dataset.note;
@@ -2334,6 +2526,7 @@ document.addEventListener('click', async e => {
     // Answering from the map sheet should not end the walk: the sheet
     // updates in place and says what happened, and you carry on.
     const fromSheet = !!mk.closest('#pitsheet');
+    choosing = null;
     const prev = marks[id] || {};
     marks[id] = { state: st, at: new Date().toISOString() };
     // a note describes the site, not the answer, so it outlives a re-report
@@ -2351,6 +2544,7 @@ document.addEventListener('click', async e => {
       const where = byId(id);
       toast(st === 'none' ? `Task made for ${where ? where.address : 'this pit'}.`
         : st === 'tree' ? 'Marked as still having a tree.'
+        : st === 'wait' ? 'Noted — the city already has a request for it.'
         : 'Report undone.');
     }
     return;
@@ -2421,7 +2615,12 @@ document.addEventListener('click', async e => {
 
 /* remember whether Details was open, so a re-render restores it */
 document.addEventListener('toggle', e => {
-  if (e.target.classList && e.target.classList.contains('more')) detailsOpen = e.target.open;
+  if (!e.target.classList) return;
+  if (e.target.classList.contains('more')) detailsOpen = e.target.open;
+  if (e.target.classList.contains('donerow')){
+    const id = e.target.dataset.done;
+    if (e.target.open) doneOpen.add(id); else doneOpen.delete(id);
+  }
 }, true);
 
 document.addEventListener('submit', async e => {
@@ -2531,7 +2730,8 @@ function fallbackCopy(text, done){
   armSheet();
 
   try{
-    const { sites, confirmed, plants } = await loadSites();
+    const { sites, confirmed, plants, stats } = await loadSites();
+    PLANT_STATS = stats;
     SITES = withReported(sites, confirmed);
     PLANTS = plants;
 
