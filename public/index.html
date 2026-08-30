@@ -89,19 +89,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
 /* ---------- browse controls ---------- */
 .pane{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
-.pane > .scroller{flex:1;padding-bottom:6rem}  /* clear the floating buttons */
-/* the view toggle is a corner icon, matching find-me on the other side */
-.viewpill{
-  position:absolute;left:1.4rem;z-index:900;
-  bottom:calc(1.4rem + env(safe-area-inset-bottom));
-  width:3.6rem;height:3.6rem;padding:.85rem;
-  display:inline-flex;align-items:center;justify-content:center;
-  border:2px solid var(--ink);border-radius:50%;cursor:pointer;
-  background:var(--ink);color:var(--paper);
-  box-shadow:0 3px 12px rgba(0,0,0,.28);
-}
-.viewpill svg{width:100%;height:100%;display:block}
-.viewpill:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
+.pane > .scroller{flex:1}
 .search{
   flex:1;min-width:9rem;
   font-family:'IBM Plex Mono',monospace;font-size:.82rem;
@@ -146,30 +134,18 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .chev{color:var(--dim);flex:0 0 auto;font-size:1.1rem}
 
 /* ---------- map ---------- */
-#map{height:72vh;min-height:380px;width:100%;border:1px solid var(--line);background:var(--wash)}
+#map{height:74vh;min-height:400px;width:100%;border:1px solid var(--line);background:var(--wash)}
 .legend{
-  display:flex;gap:1rem;flex-wrap:wrap;padding:.7rem 0 0;
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;
-  text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
+  display:flex;gap:.85rem;flex-wrap:wrap;padding:.6rem 0 0;
+  font-family:'IBM Plex Mono',monospace;font-size:.56rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--dim);opacity:.7;
 }
-/* location is a quiet control on the map, not a banner above it */
-.locate{
-  position:absolute;right:.75rem;bottom:.75rem;z-index:1000;
-  width:3.6rem;height:3.6rem;padding:.8rem;
-  background:var(--paper);color:var(--ink);
-  border:2px solid var(--ink);cursor:pointer;border-radius:50%;
-  box-shadow:0 3px 12px rgba(0,0,0,.22);
-}
-.locate svg{width:100%;height:100%;display:block}
-.locate.on{background:#0E6FD8;border-color:#0E6FD8;color:#fff}
-.locate.busy{opacity:.55}
-.locate:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
 .menear{
   font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
-  margin:.5rem 0 0;line-height:1.6;min-height:1rem;
+  margin:0 0 .55rem;line-height:1.6;min-height:1.1rem;
 }
-.menear.warn{color:var(--hot)}
 .menear.on{color:var(--ink)}
+.menear.quiet{color:var(--dim)}
 .melink{
   background:none;border:0;padding:0;cursor:pointer;text-align:left;
   font:inherit;color:var(--ink);
@@ -414,6 +390,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     </div>
     <div class="panel" id="sortpanel" hidden>
         <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
+        <p class="plabel">View</p>
+        <div class="prow">
+          <button class="chip" data-view="map" aria-pressed="true">Map</button>
+          <button class="chip" data-view="list" aria-pressed="false">List</button>
+        </div>
         <p class="plabel">Order by</p>
         <div class="prow">
           <button class="chip" data-sort="street" aria-pressed="true">Street A–Z</button>
@@ -438,17 +419,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <p class="count" id="count"></p>
       <div id="list"></div>
       <div id="mapwrap" hidden>
-        <div class="mapbox">
-          <div id="map"></div>
-          <button class="locate" id="findme" aria-label="Find me">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
         <p id="mebar" class="menear"></p>
+        <div id="map"></div>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
           <span><i style="background:#E2330A"></i>No tree</span>
@@ -459,7 +431,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       </div>
       </div>
 
-      <button class="viewpill" id="viewpill"></button>
 
 
     </section>
@@ -752,6 +723,7 @@ function findMe(){
       me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       meAcc = pos.coords.accuracy;
       meState = 'on';
+      Store.set('stump.geo', '1');   // granted once: locate silently from now on
       paintMe();
       if (tab === 'browse' && view === 'map') renderMap(filtered());
     },
@@ -774,11 +746,12 @@ function nearestUnchecked(){
   return open.reduce((a,b) => miles(me,b) < miles(me,a) ? b : a);
 }
 
+/* Location is a one-time grant, so the ask should appear once and never
+   again. Granted, the line just reports what is nearest; refused, it says
+   so quietly and offers a retry. Either way it is one line, not a control
+   parked on the map. */
 function paintMe(){
-  const el = $('#mebar'), btn = $('#findme');
-  if (btn) btn.classList.toggle('on', meState === 'on');
-  if (btn) btn.classList.toggle('busy', meState === 'finding');
-  if (!el) return;
+  const el = $('#mebar'); if (!el) return;
 
   if (meState === 'on' && me){
     const n = nearestUnchecked();
@@ -786,22 +759,24 @@ function paintMe(){
     el.innerHTML = n
       ? `<button class="melink" data-open="${esc(n.id)}">
            <b>${dist(miles(me,n))}</b> to ${esc(n.address)} →</button>`
-      : `You're on the map · nothing left to check`;
+      : `Nothing left to check nearby`;
     return;
   }
   if (meState === 'finding'){
     el.className = 'menear'; el.innerHTML = `<span class="spin">◍</span> Finding you…`; return;
   }
-  if (meState === 'idle'){ el.className = 'menear'; el.textContent = ''; return; }
-
-  el.className = 'menear warn';
-  el.textContent = {
-    blocked: meFast
-      ? 'Location is blocked for this site — clear its Website Data in Safari settings.'
-      : 'Location permission was refused.',
-    unavailable: 'No position yet — signal may be weak.',
-    unsupported: 'This browser has no location support.'
-  }[meState] || '';
+  if (meState === 'idle'){
+    el.className = 'menear';
+    el.innerHTML = `<button class="melink" id="findme">Show my location</button>`;
+    return;
+  }
+  el.className = 'menear quiet';
+  el.innerHTML = {
+    blocked: `Location is off for this site · `,
+    unavailable: `No position yet · `,
+    unsupported: `No location in this browser`
+  }[meState] + (meState === 'unsupported' ? ''
+      : `<button class="melink" id="findme">try again</button>`);
 }
 
 const dist = mi => mi * 5280 < 1000
@@ -853,8 +828,7 @@ function renderBrowse(){
       ? `${list.length} ${LABEL[show]}`
       : `${list.length} sites · ${unchecked} unchecked`;
 
-  $('#sortdot').hidden = !(show !== 'all' || sort !== 'street');
-  paintPill();
+  $('#sortdot').hidden = !(show !== 'all' || sort !== 'street' || view !== 'map');
 
   $('#list').hidden = view !== 'list';
   $('#mapwrap').hidden = view !== 'map';
@@ -877,21 +851,6 @@ function renderBrowse(){
       <span class="chev">›</span>
     </button>`;
   }).join('');
-}
-
-const ICON_LIST = `<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"
-        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-const ICON_MAP = `<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M9 3 3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3zM9 3v15M15 6v15"
-        fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
-
-function paintPill(){
-  const el = $('#viewpill'); if (!el) return;
-  el.innerHTML = view === 'map' ? ICON_LIST : ICON_MAP;
-  el.setAttribute('aria-label', view === 'map' ? 'Show list' : 'Show map');
-  // nothing should float over the open sheet
-  el.hidden = !$('#sortpanel').hidden;
 }
 
 function ensureMap(){
@@ -1209,7 +1168,6 @@ document.addEventListener('click', async e => {
     const openNow = panel.hidden;
     panel.hidden = !openNow;
     $('#sortbtn').setAttribute('aria-expanded', String(openNow));
-    paintPill();
     return;
   }
   // a tap anywhere else closes the panel, except inside it
@@ -1223,10 +1181,12 @@ document.addEventListener('click', async e => {
 
   if (e.target.closest('#findme')){ findMe(); return; }
 
-  if (e.target.closest('#viewpill')){
-    view = view === 'map' ? 'list' : 'map';
+  const vc = e.target.closest('.chip[data-view]');
+  if (vc){
+    view = vc.dataset.view;
+    document.querySelectorAll('.chip[data-view]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.view === view)));
     renderBrowse();
-    if (view === 'map') paintMe();
     return;
   }
 
@@ -1358,7 +1318,6 @@ function closeSort(){
   if (panel && !panel.hidden){
     panel.hidden = true;
     $('#sortbtn').setAttribute('aria-expanded','false');
-    paintPill();
   }
 }
 
@@ -1405,6 +1364,9 @@ function fallbackCopy(text, done){
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
   reporter = (await Store.get('stump.by')) || '';
+
+  // A previous grant means the browser will not prompt, so this is silent.
+  if (await Store.get('stump.geo')) findMe();
 
   await pullMarks({ quiet:true });
   if (Object.keys(marks).length) await pushMarks();
