@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
 :root{
   --paper:#FFFFFF;
@@ -348,22 +349,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .aimbtn.busy{opacity:.55;animation:pulse 1.2s ease-in-out infinite}
 /* stacked above the recenter control, same corner, same size */
 .shotbtn{bottom:3.75rem}
-.basebtn{
-  bottom:.5rem;left:auto;right:.5rem;
-  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
-  text-transform:uppercase;letter-spacing:.07em;min-height:2.1rem;
-  box-shadow:0 1px 4px rgba(0,0,0,.18);
-}
 /* Only the OSM basemap gets warmed — the pale one is already right, and
    imagery must not be touched at all. Same specificity, so order decides. */
 .leaflet-container .leaflet-tile-pane{filter:none}
 .tinted .leaflet-tile-pane{
   filter:grayscale(.78) sepia(.16) saturate(1.15) brightness(1.04) contrast(1.06);
 }
-/* over imagery the pins need their own contrast */
-.darkbase .pin{box-shadow:0 0 0 1px rgba(0,0,0,.35),0 2px 5px rgba(0,0,0,.5)}
-.darkbase .leaflet-control-attribution{background:rgba(11,11,12,.6)!important;color:#e8e8e6}
-.darkbase .leaflet-control-attribution a{color:#e8e8e6}
+
 .dtip{
   font-family:'IBM Plex Mono',monospace;font-size:.6rem;
   background:var(--paper);border:1px solid #C87A16;color:#8A5310;
@@ -382,8 +374,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 .pitsheet.up{transform:translateY(0)}
 .pitsheet .grip{
-  width:2.4rem;height:.25rem;border-radius:2px;background:var(--line);
-  margin:.1rem auto .7rem;
+  width:2.75rem;height:.3rem;border-radius:3px;background:#C9C7C0;
+  margin:.35rem auto .75rem;
 }
 .pitsheet h3{
   font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
@@ -400,6 +392,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   position:absolute;top:.45rem;right:.6rem;width:2.2rem;height:2.2rem;
   background:none;border:0;color:var(--dim);font-size:1.3rem;line-height:1;cursor:pointer;
 }
+/* the handle is the whole heading block, so a thumb anywhere near the top
+   of the card can drag it; nothing inside it scrolls, hence touch-action */
+.dragzone{touch-action:none;cursor:grab;padding-bottom:.1rem}
+.dragzone:active{cursor:grabbing}
+.pitsheet .grip{transition:background .15s}
+.dragzone:active .grip{background:var(--dim)}
 /* the same two-button decision as the site page, at the same size */
 .sheetchoices{margin-bottom:.6rem}
 .nearline{
@@ -676,9 +674,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
                in the middle every time after, for checking sites on the move -->
           <button class="recenter aimbtn" id="mecenter" aria-label="Center the map on my location"></button>
           <!-- photograph a stump and let the location do the looking up -->
-          <!-- the basemap is a matter of taste and of what you need to see,
-               so it is a control rather than a decision baked in -->
-          <button class="recenter basebtn" id="basebtn" aria-label="Change the map style">Soft</button>
           <button class="recenter aimbtn shotbtn" id="shotbtn" aria-label="Check a photo of a stump">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 8h3.5L8 5.5h8L17.5 8H21v12H3z" fill="none" stroke="currentColor"
@@ -737,6 +732,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Vector tiles, so the map stays sharp at the zoom where you are actually
+     standing over a tree pit. Raster tiles are pictures cut at fixed zooms;
+     past the deepest one they can only be stretched. If either of these
+     fails to load the map falls back to raster OSM on its own. -->
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.1.4/dist/leaflet-maplibre-gl.js"></script>
 <script>
 /* ============================================================
    CONFIG
@@ -752,43 +753,27 @@ const LOOKBACK_MONTHS = 6;
 // OpenStreetMap's own tiles: no API key, no watermark, full zoom range.
 // The grey, minimal look comes from a CSS filter on the tile layer instead
 // of a styled provider, all of which now want a key.
-/* Basemaps.
+/* One map, drawn rather than photographed.
 
-   OSM's standard raster is the drab part: every road coloured, every shop
-   labelled, all at the same weight. The pale, sparse look of a lettings map
-   is a different basemap, not a filter over this one.
+   Raster tiles are pictures cut at fixed zoom levels: past the deepest one
+   a provider publishes, they can only be stretched, which is why the pale
+   basemap went soft exactly where you need it — standing over the pit. The
+   pale one also stopped drawing detail at that zoom, because it was built
+   as a backdrop for data, not as a street map.
 
-   None of these need a key, and none of them can be reached from where this
-   was built — so the map carries three and falls back to OSM by itself if a
-   provider stops answering, rather than showing you a blank grid. Satellite
-   earns its place here: from above you can often see the canopy, or the gap
-   where it used to be. */
-const OSM_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const BASEMAPS = {
-  soft: {
-    label: 'Soft',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    // labels ride above the pins' own layer order as a separate pane
-    ref: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-    credit: 'Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
-    maxNativeZoom: 16, tint: false
-  },
-  streets: {
-    label: 'Streets',
-    url: OSM_TILES,
-    credit: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxNativeZoom: 19, tint: true
-  },
-  satellite: {
-    label: 'Satellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    ref: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    credit: 'Esri, Maxar, Earthstar Geographics',
-    maxNativeZoom: 19, tint: false, dark: true
-  }
-};
-const TILES = OSM_TILES;
-const TILE_CREDIT = BASEMAPS.streets.credit;
+   Vector tiles are geometry, redrawn at whatever zoom you are at, so labels
+   stay crisp and the buildings and parcels are still there at z19. This
+   style is OpenFreeMap's Positron: free, no key, no sign-up.
+
+   If MapLibre or the style fails to arrive, the map falls back to raster
+   OSM on its own rather than showing you nothing. */
+const VECTOR_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+const VECTOR_CREDIT =
+  '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> ' +
+  '&copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7gBEAS&language=en_US';
 
 const REMOVALS_SINCE = (() => {
@@ -1380,50 +1365,70 @@ function renderBrowse(){
   }).join('');
 }
 
-let base = 'soft';        // which basemap is on
-let baseLayers = [];      // the tile layers currently drawing it
-let baseTried = {};       // providers that have already failed once
+let baseLayers = [];      // whatever is drawing the basemap right now
+let rasterMode = false;   // true once we have given up on vector tiles
 
-/* Swap the basemap under everything else. If its tiles don't answer — the
-   provider is down, or blocked — fall back to OSM once and say so, rather
-   than leaving a blank grid with pins floating on it. */
-function setBase(name, quiet){
-  if (!map || !BASEMAPS[name]) return;
-  const spec = BASEMAPS[name];
-  base = name;
-  baseLayers.forEach(l => map.removeLayer(l));
+/* The basemap, on whichever map is asking — the browse map and the little
+   one on a site card should look the same. Vector when MapLibre made it
+   here, raster OSM when it didn't. */
+function addBase(target, onFail){
+  const canVector = !rasterMode &&
+    typeof maplibregl !== 'undefined' && typeof L.maplibreGL === 'function';
+
+  if (canVector){
+    try{
+      const gl = L.maplibreGL({ style: VECTOR_STYLE, attribution: VECTOR_CREDIT });
+
+      /* The style is a single request, and MapLibre can fail it silently —
+         no error event, just an empty canvas. So the watchdog is a timer:
+         if the style has not loaded in seven seconds, give up and draw
+         something. */
+      const guard = () => {
+        const mm = gl.getMaplibreMap && gl.getMaplibreMap();
+        if (!mm){ if (onFail) onFail(); return; }
+        let loaded = false;
+        mm.on('load', () => { loaded = true; });
+        setTimeout(() => { if (!loaded && onFail) onFail(); }, 7000);
+      };
+
+      gl.addTo(target);
+      // Leaflet holds a layer back until the map has a view, so the GL map
+      // may not exist yet at this point
+      if (gl.getMaplibreMap && gl.getMaplibreMap()) guard();
+      else gl.once('add', guard);
+      return gl;
+    }catch(e){ /* no WebGL, or the plugin is half-loaded — fall through */ }
+  }
+
+  // once anything falls back, every map in the app follows, so the browse
+  // map and the card's map never disagree about what they are drawing
+  rasterMode = true;
+  const l = L.tileLayer(TILES, {
+    maxZoom: 20, maxNativeZoom: 19, attribution: TILE_CREDIT, className: 'rastertile'
+  });
+  l.addTo(target);
+  return l;
+}
+
+/* Draw the basemap under the browse map, and drop to raster once if the
+   vector style never turns up. */
+function setBase(){
+  if (!map) return;
+  baseLayers.forEach(l => { try{ map.removeLayer(l); }catch(e){} });
   baseLayers = [];
-
-  let bad = 0;
-  const mk = (url, pane) => {
-    const l = L.tileLayer(url, {
-      maxZoom: 19, maxNativeZoom: spec.maxNativeZoom,
-      attribution: spec.credit, pane, className: 'basetile'
-    });
-    l.on('tileerror', () => {
-      // a handful of misses is normal at the edges; a wall of them is not
-      if (++bad === 8 && base === name && name !== 'streets' && !baseTried[name]){
-        baseTried[name] = true;
-        setBase('streets', true);
-        toast(`${spec.label} tiles aren't answering — back on Streets.`);
-      }
-    });
-    l.addTo(map);
-    baseLayers.push(l);
+  const fell = () => {
+    if (rasterMode) return;
+    rasterMode = true;
+    setBase();
+    toast('Detailed map tiles are not loading — using the plain map.');
   };
-  mk(spec.url, 'tilePane');
-  if (spec.ref) mk(spec.ref, 'labelPane');
-
-  $('#map').classList.toggle('tinted', !!spec.tint);
-  $('#map').classList.toggle('darkbase', !!spec.dark);
-  const btn = $('#basebtn');
-  if (btn) btn.textContent = spec.label;
-  if (!quiet) Store.set('stump.base', name);
+  baseLayers.push(addBase(map, fell));
+  $('#map').classList.toggle('tinted', rasterMode);
 }
 
 function ensureMap(){
   if (map || typeof L === 'undefined') return;
-  map = L.map('map', { attributionControl:true });
+  map = L.map('map', { attributionControl:true, maxZoom:20 });
   // street labels belong above the base but below the pins
   map.createPane('labelPane').style.zIndex = 250;
   map.getPane('labelPane').style.pointerEvents = 'none';
@@ -1435,8 +1440,9 @@ function ensureMap(){
   dupLayer = L.layerGroup().addTo(map);
   // a tap on the map itself, rather than a pin, puts the sheet away
   map.on('click', () => unpick());
-  setBase(base, true);
+  // the view comes first: Leaflet won't actually add a layer until it has one
   map.fitBounds(EAST_LAKEVIEW, { padding:[12,12] });
+  setBase();
 }
 
 /* You, when location is working — an accuracy halo plus a solid dot. */
@@ -1543,6 +1549,53 @@ function renderDups(){
   });
 }
 
+/* The grip is a handle, not a decoration: drag the card up and it opens
+   into the full page, drag it down and it goes away. Delegated from the
+   sheet itself, so it survives every re-render of the card's contents. */
+function armSheet(){
+  const el = $('#pitsheet');
+  if (!el) return;
+  let y0 = 0, dy = 0, live = false, moved = false;
+
+  el.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.dragzone') || e.target.closest('button')) return;
+    y0 = e.clientY; dy = 0; live = true; moved = false;
+    el.style.transition = 'none';
+    /* Capture here rather than on the first move: the card is short, so a
+       drag upward leaves it within a few pixels, and without capture every
+       move after that lands on the map instead. */
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+  });
+
+  el.addEventListener('pointermove', e => {
+    if (!live) return;
+    dy = e.clientY - y0;
+    if (!moved){
+      if (Math.abs(dy) < 8) return;     // still short enough to be a tap
+      moved = true;
+    }
+    // upward has resistance, so it feels hinged rather than thrown
+    el.style.transform = `translateY(${dy < 0 ? dy * 0.4 : dy}px)`;
+  });
+
+  const release = () => {
+    if (!live) return;
+    live = false;
+    el.style.transition = '';
+    el.style.transform = '';
+    if (!moved) return;
+    if (dy < -50 && picked && !picked.startsWith('plant:')){
+      const id = picked;
+      unpick();
+      detailId = id; tab = 'browse'; repaint(); window.scrollTo(0,0);
+    } else if (dy > 90){
+      unpick();
+    }
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+}
+
 function pick(id){
   picked = id;
   renderSheet();
@@ -1582,11 +1635,13 @@ function renderSheet(){
   if (picked.startsWith('plant:')){
     const p = PLANTS.find(x => 'plant:' + x.id === picked);
     if (!p) return;
-    el.innerHTML = `<div class="grip"></div>
-      <button class="sheetx" id="pitclose" aria-label="Close">×</button>
-      <p class="pkind plantk">Planting request · still open</p>
-      <h3>${esc(p.address)}</h3>
-      <p class="pmeta">Requested ${ago(p.at)} · ${esc(p.id)}</p>
+    el.innerHTML = `<div class="dragzone">
+        <div class="grip"></div>
+        <button class="sheetx" id="pitclose" aria-label="Close">×</button>
+        <p class="pkind plantk">Planting request · still open</p>
+        <h3>${esc(p.address)}</h3>
+        <p class="pmeta">Requested ${ago(p.at)} · ${esc(p.id)}</p>
+      </div>
       <p class="pbody">The city has been asked for a tree here and hasn't
         planted it yet. Nothing to report — it is already in the queue.</p>`;
     el.hidden = false;
@@ -1611,13 +1666,15 @@ function renderSheet(){
          <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
        </div>`;
 
-  el.innerHTML = `<div class="grip"></div>
-    <button class="sheetx" id="pitclose" aria-label="Close">×</button>
-    <p class="pkind">${label ? `<span class="pill ${cls}">${label}</span>` : 'Not checked yet'}</p>
-    <h3>${esc(s.address)}</h3>
-    <p class="pmeta">Removal closed ${ago(s.closed)}${
-      me ? ` · ${dist(miles(me, s))} from you` : ''}${
-      st === 'req' && m.sr ? ` · ${esc(m.sr)}` : ''}</p>
+  el.innerHTML = `<div class="dragzone">
+      <div class="grip"></div>
+      <button class="sheetx" id="pitclose" aria-label="Close">×</button>
+      <p class="pkind">${label ? `<span class="pill ${cls}">${label}</span>` : 'Not checked yet'}</p>
+      <h3>${esc(s.address)}</h3>
+      <p class="pmeta">Removal closed ${ago(s.closed)}${
+        me ? ` · ${dist(miles(me, s))} from you` : ''}${
+        st === 'req' && m.sr ? ` · ${esc(m.sr)}` : ''}</p>
+    </div>
     ${near.length ? `<button class="nearline" data-shownear="${esc(s.id)}">
         ${near.length === 1 ? 'A planting request' : near.length + ' planting requests'}
         already open — nearest ${dist(near[0].ft / FT_PER_MI)} away, shown on the map</button>` : ''}
@@ -1982,12 +2039,8 @@ function renderDetail(){
       // the card past the map would zoom it instead of moving the page.
       scrollWheelZoom: false
     });
-    const bm = BASEMAPS[base] || BASEMAPS.streets;
-    L.tileLayer(bm.url, { maxZoom:19, maxNativeZoom:bm.maxNativeZoom,
-      attribution:bm.credit, className:'basetile' }).addTo(mini);
-    if (bm.ref) L.tileLayer(bm.ref, { maxZoom:19, maxNativeZoom:bm.maxNativeZoom }).addTo(mini);
-    $('#minimap').classList.toggle('tinted', !!bm.tint);
-    $('#minimap').classList.toggle('darkbase', !!bm.dark);
+    addBase(mini);
+    $('#minimap').classList.toggle('tinted', rasterMode);
     L.marker([s.lat,s.lng], { icon: pinIcon(st + ' big') }).addTo(mini);
     if (me){
       L.marker([me.lat, me.lng], { icon: pinIcon('me') })
@@ -2166,12 +2219,6 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#mecenter')){
     if (me) centerOnMe();
     else { centerWhenFound = true; findMe(); }
-    return;
-  }
-
-  if (e.target.closest('#basebtn')){
-    const order = Object.keys(BASEMAPS);
-    setBase(order[(order.indexOf(base) + 1) % order.length]);
     return;
   }
 
@@ -2474,8 +2521,6 @@ function fallbackCopy(text, done){
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
   reporter = (await Store.get('stump.by')) || '';
-  const savedBase = await Store.get('stump.base');
-  if (savedBase && BASEMAPS[savedBase]) base = savedBase;
 
   // A previous grant means the browser will not prompt, so this is silent.
   if (await Store.get('stump.geo')) findMe();
@@ -2483,6 +2528,7 @@ function fallbackCopy(text, done){
   await pullMarks({ quiet:true });
   if (Object.keys(marks).length) await pushMarks();
   watchForRemoteEdits();
+  armSheet();
 
   try{
     const { sites, confirmed, plants } = await loadSites();
