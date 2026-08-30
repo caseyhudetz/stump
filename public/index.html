@@ -160,34 +160,38 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-family:'IBM Plex Mono',monospace;font-size:.62rem;
   text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
 }
-/* location sits above the map as an optional extra, never a gate */
-.mebar{
-  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
-  border:1px solid var(--line);background:var(--wash);
-  padding:.6rem .7rem;margin-bottom:.6rem;min-height:2.9rem;
+/* location is a quiet control on the map, not a banner above it */
+.locate{
+  position:absolute;right:.6rem;bottom:.6rem;z-index:1000;
+  width:2.6rem;height:2.6rem;padding:.55rem;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink);cursor:pointer;border-radius:0;
 }
-.mebtn{
-  font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 84,'wght' 700;
-  font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;
-  background:var(--ink);color:var(--paper);border:1px solid var(--ink);
-  padding:.45rem .75rem;cursor:pointer;border-radius:0;min-height:2.2rem;
+.locate svg{width:100%;height:100%;display:block}
+.locate.on{background:#0E6FD8;border-color:#0E6FD8;color:#fff}
+.locate.busy{opacity:.55}
+.locate:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.menear{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
+  margin:.5rem 0 0;line-height:1.6;min-height:1rem;
 }
-.mebtn:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
-.mehint,.mefuzz{
-  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
-  line-height:1.6;flex:1;min-width:8rem;
-}
-.mefuzz{flex:0 0 auto;color:var(--hot)}
-.medot{
-  width:.7rem;height:.7rem;border-radius:50%;background:#0E6FD8;
-  border:2px solid var(--paper);box-shadow:0 0 0 1px #0E6FD8;flex:0 0 auto;
-}
+.menear.warn{color:var(--hot)}
+.menear.on{color:var(--ink)}
 .melink{
-  flex:1;text-align:left;background:none;border:0;padding:0;cursor:pointer;
-  font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ink);
+  background:none;border:0;padding:0;cursor:pointer;text-align:left;
+  font:inherit;color:var(--ink);
   text-decoration:underline;text-underline-offset:3px;
 }
 .melink b{font-weight:600}
+/* the wordmark doubles as the way home */
+.mark button{
+  font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;
+  font-variation-settings:'wdth' 62,'wght' 800;letter-spacing:.02em;
+  text-transform:uppercase;   /* buttons don't inherit this from the h1 */
+}
+.mark button:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+/* search now sits in the header */
+.topbar .search{width:100%;margin-top:.7rem}
 .legend span{display:inline-flex;align-items:center;gap:.35rem}
 .legend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
@@ -378,7 +382,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 <div class="app">
   <div class="topbar">
     <div class="brandrow">
-      <h1 class="mark">Stump</h1>
+      <h1 class="mark"><button id="home" aria-label="Back to all sites">Stump</button></h1>
       <span class="hdr">
         <span class="sync" id="sync"></span>
         <button class="iconbtn" id="tasksbtn" hidden aria-label="Filing tasks">
@@ -391,6 +395,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </button>
       </span>
     </div>
+    <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
   </div>
 
   <main>
@@ -400,8 +405,17 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <p class="count" id="count"></p>
       <div id="list"></div>
       <div id="mapwrap" hidden>
-        <div id="mebar" class="mebar"></div>
-        <div id="map"></div>
+        <div class="mapbox">
+          <div id="map"></div>
+          <button class="locate" id="findme" aria-label="Find me">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <p id="mebar" class="menear"></p>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
           <span><i style="background:#E2330A"></i>No tree</span>
@@ -414,10 +428,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
       <div class="controls">
         <div class="seg">
-          <button data-view="list" aria-pressed="true">List</button>
-          <button data-view="map" aria-pressed="false">Map</button>
+          <button data-view="map" aria-pressed="true">Map</button>
+          <button data-view="list" aria-pressed="false">List</button>
         </div>
-        <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
         <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
@@ -702,7 +715,8 @@ const packetText = s => Object.entries(packet(s)).map(([k,v]) => k+'\n'+v).join(
    STATE
    ============================================================ */
 let SITES = [];
-let tab = 'browse', view = 'list', sort = 'street', todoOnly = false;
+let tab = 'browse', view = 'map', sort = 'street', todoOnly = false;
+let mapView = null;   // {center, zoom} — your pan survives a re-render
 let query = '', detailId = null;
 let map = null, layer = null, mini = null;
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
@@ -747,34 +761,33 @@ function nearestUnchecked(){
 }
 
 function paintMe(){
-  const el = $('#mebar'); if (!el) return;
+  const el = $('#mebar'), btn = $('#findme');
+  if (btn) btn.classList.toggle('on', meState === 'on');
+  if (btn) btn.classList.toggle('busy', meState === 'finding');
+  if (!el) return;
+
   if (meState === 'on' && me){
     const n = nearestUnchecked();
+    el.className = 'menear on';
     el.innerHTML = n
-      ? `<span class="medot"></span>
-         <button class="melink" data-open="${esc(n.id)}">
-           <b>${dist(miles(me,n))}</b> to ${esc(n.address)} →
-         </button>
-         ${meAcc && meAcc > 40 ? `<span class="mefuzz">±${Math.round(meAcc*3.28)} ft</span>` : ''}`
-      : `<span class="medot"></span>You're on the map · nothing left to check`;
+      ? `<button class="melink" data-open="${esc(n.id)}">
+           <b>${dist(miles(me,n))}</b> to ${esc(n.address)} →</button>`
+      : `You're on the map · nothing left to check`;
     return;
   }
-  if (meState === 'finding'){ el.innerHTML = `<span class="spin">◍</span> Finding you…`; return; }
-  if (meState === 'idle'){
-    el.innerHTML = `<button class="mebtn" id="findme">Find me</button>
-      <span class="mehint">show where you are and what's nearest</span>`;
-    return;
+  if (meState === 'finding'){
+    el.className = 'menear'; el.innerHTML = `<span class="spin">◍</span> Finding you…`; return;
   }
-  const why = {
+  if (meState === 'idle'){ el.className = 'menear'; el.textContent = ''; return; }
+
+  el.className = 'menear warn';
+  el.textContent = {
     blocked: meFast
-      ? `Safari has a saved “Don’t Allow” for this site. Settings → Safari →
-         Advanced → Website Data → delete this site, then reload.`
-      : `Location permission was refused.`,
-    unavailable: `No position available — signal may be weak.`,
-    unsupported: `This browser has no location support.`
-  }[meState];
-  el.innerHTML = `<button class="mebtn" id="findme">Try again</button>
-    <span class="mehint">${why}</span>`;
+      ? 'Location is blocked for this site — clear its Website Data in Safari settings.'
+      : 'Location permission was refused.',
+    unavailable: 'No position yet — signal may be weak.',
+    unsupported: 'This browser has no location support.'
+  }[meState] || '';
 }
 
 const dist = mi => mi * 5280 < 1000
@@ -854,6 +867,12 @@ function ensureMap(){
     maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
+  const keep = () => {
+    const c = map.getCenter();
+    mapView = { center:[c.lat, c.lng], zoom: map.getZoom() };
+  };
+  map.on('moveend', keep);
+  map.on('zoomend', keep);
 }
 
 function renderMap(list){
@@ -887,9 +906,11 @@ function renderMap(list){
     pts.push([me.lat, me.lng]);
   }
 
-  if (pts.length > 1) map.fitBounds(pts, { padding:[30,30], maxZoom:17 });
-  else if (pts.length) map.setView(pts[0], 17);
-  else map.setView([HOME.lat,HOME.lng], 15);
+  // Open on East Lakeview rather than fitting every pin, which zoomed out far
+  // enough to be useless. After that the view is yours — re-rendering on a
+  // sync pull must not yank you back.
+  if (mapView) map.setView(mapView.center, mapView.zoom);
+  else map.setView([HOME.lat, HOME.lng], 15);
   requestAnimationFrame(() => map.invalidateSize());
 }
 
@@ -985,6 +1006,11 @@ function renderDetail(){
     L.circleMarker([s.lat,s.lng], {
       radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1
     }).addTo(mini);
+    if (me){
+      L.circleMarker([me.lat, me.lng], {
+        radius:7, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
+      }).addTo(mini).bindPopup('<b>You</b>');
+    }
 
     mini.on('click',      () => mini.scrollWheelZoom.enable());
     mini.on('mouseout',   () => mini.scrollWheelZoom.disable());
@@ -1129,6 +1155,12 @@ document.addEventListener('click', async e => {
   }
   // a tap anywhere else closes the panel, except inside it
   if (!e.target.closest('#sortpanel')) closeSort();
+
+  if (e.target.closest('#home')){
+    tab = 'browse'; detailId = null; query = ''; closeSort();
+    const box = $('#q'); if (box) box.value = '';
+    repaint(); return;
+  }
 
   if (e.target.closest('#findme')){ findMe(); return; }
 
