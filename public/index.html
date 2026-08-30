@@ -217,12 +217,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .iconbtn.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .screenrow{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
 .screenrow .screen{margin-bottom:1.1rem}
-/* OSM's tiles warmed toward the paper this app is printed on, rather than
-   flattened to grey. Parks keep a trace of green and water a trace of blue,
-   which is most of the difference between a map and a photocopy. */
-.leaflet-tile-pane{
-  filter:grayscale(.78) sepia(.16) saturate(1.15) brightness(1.04) contrast(1.06);
-}
+/* the warming is per-basemap now, further down */
 .legend span{display:inline-flex;align-items:center;gap:.4rem}
 /* the key uses the same pins as the map, at the same size */
 .legend .pin{width:.62rem;height:.62rem;border-width:1.5px;box-shadow:none}
@@ -353,6 +348,79 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .aimbtn.busy{opacity:.55;animation:pulse 1.2s ease-in-out infinite}
 /* stacked above the recenter control, same corner, same size */
 .shotbtn{bottom:3.75rem}
+.basebtn{
+  bottom:.5rem;left:auto;right:.5rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  text-transform:uppercase;letter-spacing:.07em;min-height:2.1rem;
+  box-shadow:0 1px 4px rgba(0,0,0,.18);
+}
+/* Only the OSM basemap gets warmed — the pale one is already right, and
+   imagery must not be touched at all. Same specificity, so order decides. */
+.leaflet-container .leaflet-tile-pane{filter:none}
+.tinted .leaflet-tile-pane{
+  filter:grayscale(.78) sepia(.16) saturate(1.15) brightness(1.04) contrast(1.06);
+}
+/* over imagery the pins need their own contrast */
+.darkbase .pin{box-shadow:0 0 0 1px rgba(0,0,0,.35),0 2px 5px rgba(0,0,0,.5)}
+.darkbase .leaflet-control-attribution{background:rgba(11,11,12,.6)!important;color:#e8e8e6}
+.darkbase .leaflet-control-attribution a{color:#e8e8e6}
+.dtip{
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  background:var(--paper);border:1px solid #C87A16;color:#8A5310;
+  border-radius:0;box-shadow:none;padding:.2rem .4rem;
+}
+.dtip::before{display:none}
+
+/* ---------- the pit sheet ---------- */
+.pitsheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:1400;
+  background:var(--paper);border-top:1px solid var(--line);
+  box-shadow:0 -6px 24px rgba(11,11,12,.16);
+  padding:.5rem 1.1rem calc(1rem + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .24s cubic-bezier(.2,.8,.3,1);
+  max-height:70vh;overflow-y:auto;
+}
+.pitsheet.up{transform:translateY(0)}
+.pitsheet .grip{
+  width:2.4rem;height:.25rem;border-radius:2px;background:var(--line);
+  margin:.1rem auto .7rem;
+}
+.pitsheet h3{
+  font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
+  font-size:1.35rem;line-height:1.1;margin:.1rem 0 .3rem;overflow-wrap:break-word;
+}
+.pkind{margin:0 0 .1rem;font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.pkind.plantk{color:#8A5310}
+.pmeta{margin:0 0 .8rem;font-family:'IBM Plex Mono',monospace;
+  font-size:.64rem;color:var(--dim);line-height:1.6}
+.pbody{margin:0;font-family:'IBM Plex Mono',monospace;font-size:.68rem;
+  line-height:1.7;color:var(--ink)}
+.sheetx{
+  position:absolute;top:.45rem;right:.6rem;width:2.2rem;height:2.2rem;
+  background:none;border:0;color:var(--dim);font-size:1.3rem;line-height:1;cursor:pointer;
+}
+/* the same two-button decision as the site page, at the same size */
+.sheetchoices{margin-bottom:.6rem}
+.nearline{
+  display:block;width:100%;text-align:left;
+  background:#FDF6EC;border:0;border-left:4px solid #C87A16;
+  padding:.55rem .7rem;margin:0 0 .8rem;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;line-height:1.6;color:#8A5310;
+}
+.expand{
+  display:block;width:100%;background:none;border:0;padding:.7rem 0 .1rem;
+  cursor:pointer;color:var(--dim);
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.expand:hover{color:var(--ink)}
+/* the selected pit, and the requests drawn around it */
+.pin.sel{
+  width:1.35rem;height:1.35rem;margin:-.2rem;
+  box-shadow:0 0 0 3px rgba(11,11,12,.18),0 2px 6px rgba(11,11,12,.5);
+}
+.pin.near{width:.85rem;height:.85rem;opacity:.95}
 
 /* what the photo found, over the map it came from */
 .sheetwrap{position:fixed;inset:0;z-index:1500;display:flex;align-items:flex-end}
@@ -608,6 +676,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
                in the middle every time after, for checking sites on the move -->
           <button class="recenter aimbtn" id="mecenter" aria-label="Center the map on my location"></button>
           <!-- photograph a stump and let the location do the looking up -->
+          <!-- the basemap is a matter of taste and of what you need to see,
+               so it is a control rather than a decision baked in -->
+          <button class="recenter basebtn" id="basebtn" aria-label="Change the map style">Soft</button>
           <button class="recenter aimbtn shotbtn" id="shotbtn" aria-label="Check a photo of a stump">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 8h3.5L8 5.5h8L17.5 8H21v12H3z" fill="none" stroke="currentColor"
@@ -632,6 +703,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <section id="detail" class="scroller" hidden></section>
     <div class="dock" id="dock" hidden></div>
     <div class="sheetwrap" id="photosheet" hidden></div>
+    <!-- raised by a tap on the map: address, the decision, and a way in -->
+    <div class="pitsheet" id="pitsheet" hidden></div>
     <!-- no capture attribute: iOS then offers the camera *and* the library,
          and a library photo brings its own coordinates with it -->
     <input type="file" id="shotfile" accept="image/*" hidden>
@@ -679,8 +752,43 @@ const LOOKBACK_MONTHS = 6;
 // OpenStreetMap's own tiles: no API key, no watermark, full zoom range.
 // The grey, minimal look comes from a CSS filter on the tile layer instead
 // of a styled provider, all of which now want a key.
-const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+/* Basemaps.
+
+   OSM's standard raster is the drab part: every road coloured, every shop
+   labelled, all at the same weight. The pale, sparse look of a lettings map
+   is a different basemap, not a filter over this one.
+
+   None of these need a key, and none of them can be reached from where this
+   was built — so the map carries three and falls back to OSM by itself if a
+   provider stops answering, rather than showing you a blank grid. Satellite
+   earns its place here: from above you can often see the canopy, or the gap
+   where it used to be. */
+const OSM_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const BASEMAPS = {
+  soft: {
+    label: 'Soft',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    // labels ride above the pins' own layer order as a separate pane
+    ref: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    credit: 'Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+    maxNativeZoom: 16, tint: false
+  },
+  streets: {
+    label: 'Streets',
+    url: OSM_TILES,
+    credit: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxNativeZoom: 19, tint: true
+  },
+  satellite: {
+    label: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    ref: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    credit: 'Esri, Maxar, Earthstar Geographics',
+    maxNativeZoom: 19, tint: false, dark: true
+  }
+};
+const TILES = OSM_TILES;
+const TILE_CREDIT = BASEMAPS.streets.credit;
 const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7gBEAS&language=en_US';
 
 const REMOVALS_SINCE = (() => {
@@ -1042,6 +1150,8 @@ let tab = 'browse', view = 'map', sort = 'street', show = 'all';
 let query = '', detailId = null;
 let map = null, layer = null, mini = null, meLayer = null;
 let pins = {};            // site id -> marker, reused between renders
+let dupLayer = null;      // open requests around the pit you are looking at
+let picked = null;        // the pin whose sheet is up
 let mapFramed = false;    // the opening view is set once, then the map is yours
 let noting = null;        // site id whose note is being written
 let noteDraft = '';       // what is in the box, so a sync pull can't wipe it
@@ -1270,14 +1380,62 @@ function renderBrowse(){
   }).join('');
 }
 
+let base = 'soft';        // which basemap is on
+let baseLayers = [];      // the tile layers currently drawing it
+let baseTried = {};       // providers that have already failed once
+
+/* Swap the basemap under everything else. If its tiles don't answer — the
+   provider is down, or blocked — fall back to OSM once and say so, rather
+   than leaving a blank grid with pins floating on it. */
+function setBase(name, quiet){
+  if (!map || !BASEMAPS[name]) return;
+  const spec = BASEMAPS[name];
+  base = name;
+  baseLayers.forEach(l => map.removeLayer(l));
+  baseLayers = [];
+
+  let bad = 0;
+  const mk = (url, pane) => {
+    const l = L.tileLayer(url, {
+      maxZoom: 19, maxNativeZoom: spec.maxNativeZoom,
+      attribution: spec.credit, pane, className: 'basetile'
+    });
+    l.on('tileerror', () => {
+      // a handful of misses is normal at the edges; a wall of them is not
+      if (++bad === 8 && base === name && name !== 'streets' && !baseTried[name]){
+        baseTried[name] = true;
+        setBase('streets', true);
+        toast(`${spec.label} tiles aren't answering — back on Streets.`);
+      }
+    });
+    l.addTo(map);
+    baseLayers.push(l);
+  };
+  mk(spec.url, 'tilePane');
+  if (spec.ref) mk(spec.ref, 'labelPane');
+
+  $('#map').classList.toggle('tinted', !!spec.tint);
+  $('#map').classList.toggle('darkbase', !!spec.dark);
+  const btn = $('#basebtn');
+  if (btn) btn.textContent = spec.label;
+  if (!quiet) Store.set('stump.base', name);
+}
+
 function ensureMap(){
   if (map || typeof L === 'undefined') return;
   map = L.map('map', { attributionControl:true });
-  L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(map);
+  // street labels belong above the base but below the pins
+  map.createPane('labelPane').style.zIndex = 250;
+  map.getPane('labelPane').style.pointerEvents = 'none';
   layer = L.layerGroup().addTo(map);
   // your own dot lives in its own layer: a position fix can then be drawn
   // without touching the site pins, popup and all
   meLayer = L.layerGroup().addTo(map);
+  // what is already asked for around the pit you are looking at
+  dupLayer = L.layerGroup().addTo(map);
+  // a tap on the map itself, rather than a pin, puts the sheet away
+  map.on('click', () => unpick());
+  setBase(base, true);
   map.fitBounds(EAST_LAKEVIEW, { padding:[12,12] });
 }
 
@@ -1304,22 +1462,18 @@ function pinIcon(kind){
   });
 }
 
-/* Every pin the map draws, from whatever it is drawing. */
+/* Every pin the map draws, from whatever it is drawing. Tapping one raises
+   the sheet rather than a popup: a popup can't hold the decision, and on a
+   phone it lands wherever the pin happens to be. */
 function siteSpecs(list){
   return list.map(s => ({
-    id: s.id, lat: s.lat, lng: s.lng, kind: stateOf(s),
-    popup: `<b>${esc(s.address)}</b>
-            <span class="pm">Removal closed ${ago(s.closed)}</span>
-            <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`
+    id: s.id, lat: s.lat, lng: s.lng, kind: stateOf(s)
   }));
 }
 
 function plantSpecs(list){
   return list.map(p => ({
-    id: 'plant:' + p.id, lat: p.lat, lng: p.lng, kind: 'plant',
-    popup: `<b>${esc(p.address)}</b>
-            <span class="pm">Tree requested ${ago(p.at)}</span>
-            <span class="pm">${esc(p.id)} · still open with the city</span>`
+    id: 'plant:' + p.id, lat: p.lat, lng: p.lng, kind: 'plant'
   }));
 }
 
@@ -1338,19 +1492,20 @@ function renderMap(specs){
     if (!want.has(id)){ layer.removeLayer(pins[id]); delete pins[id]; }
   }
   specs.forEach(spec => {
+    const kind = spec.kind + (spec.id === picked ? ' sel' : '');
     let m = pins[spec.id];
     if (!m){
-      m = L.marker([spec.lat, spec.lng], { icon: pinIcon(spec.kind) }).addTo(layer);
-      // bound once, so re-rendering never disturbs an open popup
-      m.bindPopup(spec.popup);
-      m._kind = spec.kind;
+      m = L.marker([spec.lat, spec.lng], { icon: pinIcon(kind) }).addTo(layer);
+      m.on('click', () => pick(spec.id));
+      m._kind = kind;
       pins[spec.id] = m;
       return;
     }
-    if (m._kind !== spec.kind){ m._kind = spec.kind; m.setIcon(pinIcon(spec.kind)); }
+    if (m._kind !== kind){ m._kind = kind; m.setIcon(pinIcon(kind)); }
   });
 
   renderMe();
+  renderDups();
 
   // The opening view is the whole neighbourhood; after that the map is
   // yours, and no later render moves it.
@@ -1361,6 +1516,115 @@ function renderMap(specs){
       map.fitBounds(EAST_LAKEVIEW, { padding:[12,12] });
     }
   });
+}
+
+/* ============================================================
+   THE PIT SHEET
+   ============================================================
+   Tapping a pin raises a card from the bottom of the screen rather than a
+   popup over the map: the decision belongs under your thumb, the map stays
+   visible above it, and the same card expands into the full site page. */
+
+/* Whatever is already asked for around the selected pit, drawn so the
+   distance is a thing you can see rather than a number you have to trust. */
+function renderDups(){
+  if (!dupLayer) return;
+  dupLayer.clearLayers();
+  const s = picked && !picked.startsWith('plant:') ? byId(picked) : null;
+  if (!s) return;
+  nearbyRequests(s).forEach(({p, ft}) => {
+    L.polyline([[s.lat, s.lng], [p.lat, p.lng]], {
+      color:'#C87A16', weight:2, opacity:.9, dashArray:'4 4'
+    }).addTo(dupLayer);
+    L.marker([p.lat, p.lng], { icon: pinIcon('plant near') })
+      .addTo(dupLayer)
+      .bindTooltip(`${dist(ft / FT_PER_MI)} · requested ${ago(p.at)}`,
+        { direction:'top', className:'dtip', offset:[0,-8] });
+  });
+}
+
+function pick(id){
+  picked = id;
+  renderSheet();
+  if (map){
+    const m = pins[id];
+    if (m){
+      const z = Math.max(map.getZoom(), 17);
+      map.setView(m.getLatLng(), z);
+      // lift the pin clear of the card that just covered the lower half
+      requestAnimationFrame(() => {
+        const h = ($('#pitsheet') || {}).offsetHeight || 0;
+        if (h) map.panBy([0, h / 2], { animate:true, duration:.25 });
+      });
+    }
+    renderMap(currentSpecs());
+  }
+}
+
+function unpick(){
+  if (!picked) return;
+  picked = null;
+  const el = $('#pitsheet');
+  if (el){ el.classList.remove('up'); setTimeout(() => { el.hidden = true; }, 220); }
+  if (map) renderMap(currentSpecs());
+}
+
+/* What the map is drawing right now, so a selection can re-render without
+   the caller having to remember which list it came from. */
+function currentSpecs(){
+  return show === 'plant' ? plantSpecs(filteredPlants()) : siteSpecs(filtered());
+}
+
+function renderSheet(){
+  const el = $('#pitsheet');
+  if (!el || !picked) return;
+
+  if (picked.startsWith('plant:')){
+    const p = PLANTS.find(x => 'plant:' + x.id === picked);
+    if (!p) return;
+    el.innerHTML = `<div class="grip"></div>
+      <button class="sheetx" id="pitclose" aria-label="Close">×</button>
+      <p class="pkind plantk">Planting request · still open</p>
+      <h3>${esc(p.address)}</h3>
+      <p class="pmeta">Requested ${ago(p.at)} · ${esc(p.id)}</p>
+      <p class="pbody">The city has been asked for a tree here and hasn't
+        planted it yet. Nothing to report — it is already in the queue.</p>`;
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('up'));
+    return;
+  }
+
+  const s = byId(picked);
+  if (!s) return;
+  const st = stateOf(s);
+  const m = marks[s.id] || {};
+  const near = nearbyRequests(s);
+  const [cls, label] = PILL[st];
+
+  const decision = st === 'open'
+    ? `<div class="choices sheetchoices">
+         <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
+         <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+       </div>`
+    : `<div class="btnrow">
+         ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>` : ''}
+         <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
+       </div>`;
+
+  el.innerHTML = `<div class="grip"></div>
+    <button class="sheetx" id="pitclose" aria-label="Close">×</button>
+    <p class="pkind">${label ? `<span class="pill ${cls}">${label}</span>` : 'Not checked yet'}</p>
+    <h3>${esc(s.address)}</h3>
+    <p class="pmeta">Removal closed ${ago(s.closed)}${
+      me ? ` · ${dist(miles(me, s))} from you` : ''}${
+      st === 'req' && m.sr ? ` · ${esc(m.sr)}` : ''}</p>
+    ${near.length ? `<button class="nearline" data-shownear="${esc(s.id)}">
+        ${near.length === 1 ? 'A planting request' : near.length + ' planting requests'}
+        already open — nearest ${dist(near[0].ft / FT_PER_MI)} away, shown on the map</button>` : ''}
+    ${decision}
+    <button class="expand" data-open="${esc(s.id)}">Full details ›</button>`;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('up'));
 }
 
 /* ============================================================
@@ -1718,7 +1982,12 @@ function renderDetail(){
       // the card past the map would zoom it instead of moving the page.
       scrollWheelZoom: false
     });
-    L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(mini);
+    const bm = BASEMAPS[base] || BASEMAPS.streets;
+    L.tileLayer(bm.url, { maxZoom:19, maxNativeZoom:bm.maxNativeZoom,
+      attribution:bm.credit, className:'basetile' }).addTo(mini);
+    if (bm.ref) L.tileLayer(bm.ref, { maxZoom:19, maxNativeZoom:bm.maxNativeZoom }).addTo(mini);
+    $('#minimap').classList.toggle('tinted', !!bm.tint);
+    $('#minimap').classList.toggle('darkbase', !!bm.dark);
     L.marker([s.lat,s.lng], { icon: pinIcon(st + ' big') }).addTo(mini);
     if (me){
       L.marker([me.lat, me.lng], { icon: pinIcon('me') })
@@ -1859,6 +2128,7 @@ function repaint(){
   $('#detail').hidden = !(tab === 'browse' && detailId);
   $('#tasks').hidden  = tab !== 'tasks';
   if (!(tab === 'browse' && detailId)){ $('#dock').hidden = true; killMini(); }
+  if (tab !== 'browse' || detailId || view !== 'map') unpick();
 
   const n = tasks().length;
   $('#taskdot').hidden = !n;
@@ -1896,6 +2166,28 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#mecenter')){
     if (me) centerOnMe();
     else { centerWhenFound = true; findMe(); }
+    return;
+  }
+
+  if (e.target.closest('#basebtn')){
+    const order = Object.keys(BASEMAPS);
+    setBase(order[(order.indexOf(base) + 1) % order.length]);
+    return;
+  }
+
+  if (e.target.closest('#pitclose')){ unpick(); return; }
+
+  // "shown on the map" means it: frame the pit and everything asked for near it
+  const sn = e.target.closest('[data-shownear]');
+  if (sn && map){
+    const s = byId(sn.dataset.shownear);
+    const near = s ? nearbyRequests(s) : [];
+    if (s && near.length){
+      const pts = [[s.lat, s.lng], ...near.map(({p}) => [p.lat, p.lng])];
+      const h = ($('#pitsheet') || {}).offsetHeight || 0;
+      map.fitBounds(L.latLngBounds(pts).pad(0.6),
+        { paddingBottomRight:[0, h], maxZoom: 19 });
+    }
     return;
   }
 
@@ -1966,12 +2258,12 @@ document.addEventListener('click', async e => {
   }
 
   const open = e.target.closest('[data-open]');
-  if (open){ closeShot(); detailId = open.dataset.open; tab = 'browse'; repaint(); window.scrollTo(0,0); return; }
+  if (open){ closeShot(); unpick(); detailId = open.dataset.open; tab = 'browse'; repaint(); window.scrollTo(0,0); return; }
 
   if (e.target.closest('#back')){ detailId = null; repaint(); return; }
 
   const goto = e.target.closest('[data-goto-task]');
-  if (goto){ closeShot(); tab = 'tasks'; detailId = null; repaint(); return; }
+  if (goto){ closeShot(); unpick(); tab = 'tasks'; detailId = null; repaint(); return; }
 
   const nb = e.target.closest('[data-note]');
   if (nb){
@@ -1992,6 +2284,9 @@ document.addEventListener('click', async e => {
     // the site's own card, so it lands in the same place
     const fromShot = !!mk.closest('#photosheet');
     if (fromShot) closeShot();
+    // Answering from the map sheet should not end the walk: the sheet
+    // updates in place and says what happened, and you carry on.
+    const fromSheet = !!mk.closest('#pitsheet');
     const prev = marks[id] || {};
     marks[id] = { state: st, at: new Date().toISOString() };
     // a note describes the site, not the answer, so it outlives a re-report
@@ -2004,6 +2299,13 @@ document.addEventListener('click', async e => {
     // reporting "no tree" is the moment a task is born — take them to it
     if (st === 'none' && (detailId === id || fromShot)){ tab = 'tasks'; detailId = null; }
     repaint();
+    if (fromSheet){
+      renderSheet();
+      const where = byId(id);
+      toast(st === 'none' ? `Task made for ${where ? where.address : 'this pit'}.`
+        : st === 'tree' ? 'Marked as still having a tree.'
+        : 'Report undone.');
+    }
     return;
   }
 
@@ -2172,6 +2474,8 @@ function fallbackCopy(text, done){
     if (saved) marks = JSON.parse(saved);
   }catch(e){ marks = {}; }
   reporter = (await Store.get('stump.by')) || '';
+  const savedBase = await Store.get('stump.base');
+  if (savedBase && BASEMAPS[savedBase]) base = savedBase;
 
   // A previous grant means the browser will not prompt, so this is silent.
   if (await Store.get('stump.geo')) findMe();
