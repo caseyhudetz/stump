@@ -12,6 +12,6 @@
   // each other. Without this binding /api/marks answers 503 and the app
   // falls back to device-local storage.
   "kv_namespaces": [
-    { "binding": "MARKS", "id": "8f3c2a1b9d4e5f6a7b8c9d0e1f2a3b4c" }
+    { "binding": "MARKS", "id": "98d8f5a6c02248d9846899352319ef31" }
   ]
 }
