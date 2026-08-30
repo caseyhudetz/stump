@@ -133,6 +133,21 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pill.req{background:var(--ok);border-color:var(--ok);color:#fff}
 .pill.tree{background:var(--wash)}
 .pill.plant{background:#C87A16;border-color:#C87A16;color:#fff}
+/* a request already open close by — the thing most likely to make a
+   filing pointless, so it is said before the form is opened */
+.dupwarn{
+  background:#FDF6EC;border-left:4px solid #C87A16;
+  padding:.8rem .9rem;margin:0 0 1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.65;
+}
+.dupwarn .dhead{
+  margin:0 0 .35rem;color:#8A5310;
+  text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:600;
+}
+.dupwarn .dbody{margin:0 0 .5rem;color:var(--ink)}
+.dupwarn .dhit{margin:.25rem 0 0;color:var(--dim)}
+.dupwarn .dhit b{color:var(--ink);font-weight:600}
+.dflag{color:#8A5310;font-weight:600}
 /* a planting request is a fact to look at, not a site to decide about */
 .row.static{cursor:default}
 .chev{color:var(--dim);flex:0 0 auto;font-size:1.1rem}
@@ -187,9 +202,21 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 .mark button:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
 /* the sheet hangs under the header; search lives inside it */
-.topbar .panel{margin-top:.8rem}
 .panel .search{width:100%;margin-bottom:.9rem}
-/* OSM's own tiles, desaturated so the pins are the only colour on screen */
+.pfoot{border-top:1px solid var(--line);margin-top:.9rem;padding-top:.7rem}
+.pfoot .linkish{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim)}
+/* filter and locate sit together, in one weight, above what they act on */
+.countrow .tools{display:flex;align-items:center;gap:.9rem;flex:0 0 auto}
+#sortbtn{position:relative}
+#sortbtn .dot{
+  position:absolute;top:-2px;right:-4px;
+  width:.42rem;height:.42rem;border-radius:50%;background:var(--hot);
+}
+#sortbtn[aria-expanded="true"]{color:var(--ink)}
+/* where you are in the app, since Tasks is a place you can be */
+.iconbtn.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.screenrow{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.screenrow .screen{margin-bottom:1.1rem}
 /* OSM's tiles warmed toward the paper this app is printed on, rather than
    flattened to grey. Parks keep a trace of green and water a trace of blue,
    which is most of the difference between a map and a photocopy. */
@@ -516,14 +543,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <div class="brandrow">
       <h1 class="mark"><button id="home" aria-label="Back to all sites">Stump</button></h1>
       <span class="hdr">
-        <span class="sync" id="sync"></span>
-        <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span class="dot" id="sortdot" hidden></span>
-        </button>
         <button class="iconbtn" id="tasksbtn" hidden aria-label="Filing tasks">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 4h8a1 1 0 0 1 1 1v15l-5-3-5 3V5a1 1 0 0 1 1-1z"
@@ -534,7 +553,28 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </button>
       </span>
     </div>
-    <div class="panel" id="sortpanel" hidden>
+  </div>
+
+  <main>
+    <section id="browse" class="pane">
+      <div class="scroller">
+      <div id="guestnote"></div>
+      <!-- the two controls that act on what is below them sit with the count,
+           in the same weight, rather than up in the chrome -->
+      <div class="countrow">
+        <p class="count" id="count"></p>
+        <span class="tools">
+          <button class="aim" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="dot" id="sortdot" hidden></span>
+          </button>
+          <span id="mebar" class="menear"></span>
+        </span>
+      </div>
+      <div class="panel" id="sortpanel" hidden>
         <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
         <p class="plabel">View</p>
         <div class="prow">
@@ -556,16 +596,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
           <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
           <button class="chip" data-show="plant" aria-pressed="false">Planting requested</button>
         </div>
-      </div>
-  </div>
-
-  <main>
-    <section id="browse" class="pane">
-      <div class="scroller">
-      <div id="guestnote"></div>
-      <div class="countrow">
-        <p class="count" id="count"></p>
-        <span id="mebar" class="menear"></span>
+        <div class="pfoot">
+          <button class="linkish" id="clearfilters" hidden>Clear all filters</button>
+        </div>
       </div>
       <div id="list"></div>
       <div id="mapwrap" hidden>
@@ -605,7 +638,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
     <section id="tasks" class="scroller" hidden>
       <button class="back" id="backsites">‹ All sites</button>
-      <h2 class="screen">Tasks</h2>
+      <!-- sync belongs where its consequence lands: these are the records
+           that have to reach the other device -->
+      <div class="screenrow">
+        <h2 class="screen">Tasks</h2>
+        <span class="sync" id="sync"></span>
+      </div>
       <div id="tasklist"></div>
       <div class="share">
         <p class="sharelede">Others can help check sites. Anything they report
@@ -634,6 +672,7 @@ const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 /* The map opens on the neighbourhood, not on one house: roughly Diversey to
    Irving Park, the lake to Ashland. Framing home put half the ward off screen. */
 const EAST_LAKEVIEW = [[41.9325, -87.6585], [41.9590, -87.6360]];
+const FT_PER_MI = 5280;
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
@@ -865,6 +904,10 @@ async function loadSites(){
         titleCase([p.street_direction, p.street_name, p.street_type].filter(Boolean).join(' ')),
       sortKey: (p.street_name||'').toUpperCase() + ' ' +
         String(parseInt(p.street_number,10)||0).padStart(6,'0'),
+      // kept for the duplicate check: the same block is a stronger signal
+      // than raw distance when the city's geocoding is loose
+      num: parseInt(p.street_number,10) || 0,
+      streetKey: (p.street_name||'').toUpperCase().trim(),
       lat: +p.latitude, lng: +p.longitude,
       at: p.created_date, status: p.status || 'Open'
     }))
@@ -881,6 +924,7 @@ function siteFrom(r){
     num: parseInt(r.street_number,10) || 0,
     street,
     sortKey: (r.street_name||'').toUpperCase() + ' ' + String(parseInt(r.street_number,10)||0).padStart(6,'0'),
+    streetKey: (r.street_name||'').toUpperCase().trim(),
     address: r.street_number+' '+street,
     zip: r.zip_code || '60657',
     lat: +r.latitude, lng: +r.longitude,
@@ -893,6 +937,44 @@ function siteFrom(r){
 function snapshot(s){
   return { address:s.address, sortKey:s.sortKey, zip:s.zip,
            lat:s.lat, lng:s.lng, closed:s.closed };
+}
+
+/* ============================================================
+   NOT ASKING TWICE
+   ============================================================
+   A site leaves the list only when a planting request sits at exactly the
+   same street number. But the city geocodes to an address centroid, tree
+   pits are 25-40 ft apart, and a request filed for 702 W does nothing to
+   protect 700 W next door. So before a request is filed, look for open
+   ones close by — by distance, and by street number on the same street,
+   which catches the case where the coordinates are loose. */
+const DUP_FT = 150;
+const DUP_NUMBERS = 10;   // five or so addresses either way
+
+function nearbyRequests(s){
+  if (!s || !PLANTS.length || !Number.isFinite(+s.lat)) return [];
+  return PLANTS
+    .map(p => ({ p, ft: miles(s, p) * FT_PER_MI }))
+    .filter(({p, ft}) => ft <= DUP_FT ||
+      (s.streetKey && s.streetKey === p.streetKey && Math.abs((s.num||0) - p.num) <= DUP_NUMBERS))
+    .sort((a,b) => a.ft - b.ft)
+    .slice(0, 4);
+}
+
+/* Said in full where a request is about to be filed, and in one line
+   wherever a site is merely listed. */
+function dupWarning(s){
+  const hits = nearbyRequests(s);
+  if (!hits.length) return '';
+  return `<div class="dupwarn">
+    <p class="dhead">Check this isn't a duplicate</p>
+    <p class="dbody">The city already has ${hits.length === 1
+      ? 'an open planting request near this pit. If it covers'
+      : hits.length + ' open planting requests near this pit. If one of them covers'}
+      the spot you are looking at, a tree has already been asked for there.</p>
+    ${hits.map(({p, ft}) => `<p class="dhit"><b>${esc(p.address)}</b> ·
+      ${dist(ft / FT_PER_MI)} away · ${esc(p.id)} · requested ${ago(p.at)}</p>`).join('')}
+  </div>`;
 }
 
 /* Your reports outlive the city's open list. A site drops out of that list
@@ -1137,7 +1219,12 @@ function renderBrowse(){
         ? `${list.length} ${LABEL[show]}`
         : `${list.length} sites · ${unchecked} unchecked`;
 
-  $('#sortdot').hidden = !(show !== 'all' || sort !== 'street' || view !== 'map');
+  // the dot marks a narrowed list, which map-vs-list is not
+  const filtered_ = show !== 'all' || sort !== 'street' || !!query.trim();
+  $('#sortdot').hidden = !filtered_;
+  // the whole footer goes, so an empty rule doesn't sit under the chips
+  $('#clearfilters').closest('.pfoot').hidden = !filtered_;
+  $('#clearfilters').hidden = !filtered_;
   $('#legend').classList.toggle('plants', plantView);
 
   $('#list').hidden = view !== 'list';
@@ -1169,10 +1256,13 @@ function renderBrowse(){
   $('#list').innerHTML = list.map(s => {
     const st = stateOf(s);
     const [cls, label] = PILL[st];
+    // said here too, so a duplicate is visible before you walk to it
+    const dup = (st === 'open' || st === 'none') && nearbyRequests(s).length;
     return `<button class="row" data-open="${esc(s.id)}">
       <span class="rmain">
         <span class="raddr">${esc(s.address)}</span>
-        <span class="rmeta">Removal closed ${ago(s.closed)} · ${miles(HOME,s).toFixed(2)} mi from home</span>
+        <span class="rmeta">Removal closed ${ago(s.closed)} · ${miles(HOME,s).toFixed(2)} mi from home${
+          dup ? ` · <b class="dflag">request nearby</b>` : ''}</span>
       </span>
       ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
       <span class="chev">›</span>
@@ -1394,7 +1484,6 @@ const VERDICT = {
    inside the error — reading the nearest record as *the* record turns a
    fresh stump into "already reported". So: assert nothing unless one pit is
    both close and clearly closer than the next, and otherwise ask. */
-const FT_PER_MI = 5280;
 const CONFIDENT_FT = 75;      // nearer than this, and it is plausibly the one
 const CANDIDATE_FT = 350;     // about a block: worth offering, never assuming
 
@@ -1476,6 +1565,7 @@ function verdictFor(hit, rest){
       closed ${ago(s.closed)}</p>
     <div class="verdict ${st}">${VERDICT[st]}${
       st === 'req' && m.sr ? ` <b>${esc(m.sr)}</b>` : ''}</div>
+    ${st === 'open' || st === 'none' ? dupWarning(s) : ''}
     ${action}
     ${rest.length ? `<div class="others">
       <p class="olabel">Not this one? Also within ${dist(CANDIDATE_FT / FT_PER_MI)}</p>
@@ -1588,6 +1678,7 @@ function renderDetail(){
 
     ${banner}
     ${cityLine(s)}
+    ${st === 'open' || st === 'none' ? dupWarning(s) : ''}
     ${noteBlock(s.id)}
     <div class="mapbox">
       <div id="minimap"></div>
@@ -1724,7 +1815,8 @@ function renderTasks(){
           <button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen</button>
         </div>
         ${filing === s.id ? srForm(s) : ''}`
-      : `<ol class="steps">
+      : `${dupWarning(s)}
+        <ol class="steps">
           <li>Open the 311 planting request form.</li>
           <li>Paste each field below.</li>
           <li>Submit, then mark it filed here.</li>
@@ -1770,8 +1862,14 @@ function repaint(){
 
   const n = tasks().length;
   $('#taskdot').hidden = !n;
-  $('#tasksbtn').setAttribute('aria-label',
-    n ? `${n} filing task${n===1?'':'s'}` : 'Filing tasks');
+  // Tasks is a place you can be standing, so the nav says when you are
+  const tb = $('#tasksbtn');
+  tb.classList.toggle('on', tab === 'tasks');
+  if (tab === 'tasks') tb.setAttribute('aria-current', 'page');
+  else tb.removeAttribute('aria-current');
+  tb.setAttribute('aria-label',
+    tab === 'tasks' ? 'Tasks, current page'
+      : n ? `${n} filing task${n===1?'':'s'}` : 'Filing tasks');
 
   if (tab === 'browse' && detailId) renderDetail();
   else if (tab === 'browse') renderBrowse();
@@ -1831,6 +1929,17 @@ document.addEventListener('click', async e => {
   }
 
   if (e.target.closest('#findme')){ findMe(); return; }
+
+  if (e.target.closest('#clearfilters')){
+    query = ''; sort = 'street'; show = 'all';
+    const box = $('#q'); if (box) box.value = '';
+    document.querySelectorAll('.chip[data-sort]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.sort === 'street')));
+    document.querySelectorAll('.chip[data-show]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.show === 'all')));
+    renderBrowse();
+    return;
+  }
 
   const vc = e.target.closest('.chip[data-view]');
   if (vc){
