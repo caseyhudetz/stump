@@ -33,6 +33,27 @@ function stampedNow(at, now) {
 }
 
 /**
+ * Enough of the site to rebuild the report without the city's help. A site
+ * leaves the 311 query the moment a planting request exists at the address,
+ * which is exactly what filing one does, so a report that carried only an
+ * id would erase itself the moment it succeeded.
+ */
+function cleanSite(s) {
+  if (!s || typeof s !== 'object') return null;
+  const lat = Number(s.lat), lng = Number(s.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
+  const address = str(s.address, 80);
+  if (!address) return null;
+  const out = { address, lat, lng };
+  for (const k of ['sortKey', 'zip', 'closed']) {
+    const v = str(s[k], 60);
+    if (v) out[k] = v;
+  }
+  return out;
+}
+
+/**
  * One mark, normalized. Only known fields survive, so a client cannot grow
  * the stored record arbitrarily — but `by` has to be carried through, or
  * attribution on a shared report would be dropped on the first sync.
@@ -45,6 +66,8 @@ function clean(m, now) {
   // what the person standing at the pit saw — several pits at one address,
   // a stump left in the ground — which nothing else in the record can say
   if (typeof m.note === 'string' && m.note.trim()) out.note = m.note.trim().slice(0, 200);
+  const site = cleanSite(m.site);
+  if (site) out.site = site;
   return out;
 }
 

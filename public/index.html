@@ -280,6 +280,43 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .aimbtn svg{width:1.4rem;height:1.4rem}
 .aimbtn.on{color:#0E6FD8;border-color:#0E6FD8}
 .aimbtn.busy{opacity:.55;animation:pulse 1.2s ease-in-out infinite}
+/* stacked above the recenter control, same corner, same size */
+.shotbtn{bottom:3.75rem}
+
+/* what the photo found, over the map it came from */
+.sheetwrap{position:fixed;inset:0;z-index:1500;display:flex;align-items:flex-end}
+.sheetwrap::before{content:'';position:absolute;inset:0;background:rgba(11,11,12,.45)}
+.sheet{
+  position:relative;width:100%;max-height:82vh;overflow-y:auto;
+  background:var(--paper);border-top:3px solid var(--ink);
+  padding:1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+}
+.sheet .shead{display:flex;align-items:flex-start;gap:.9rem;margin-bottom:1rem}
+.sheet .shot{width:5.5rem;height:5.5rem;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
+.sheet .sfrom{font-family:'IBM Plex Mono',monospace;font-size:.62rem;line-height:1.6;
+  color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
+.sheet h3{
+  font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
+  font-size:1.3rem;line-height:1.1;margin:.3rem 0 .35rem;overflow-wrap:break-word;
+}
+.sheet .sdist{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim)}
+.verdict{
+  padding:.75rem .85rem;margin:.9rem 0;
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
+}
+.verdict.open{background:var(--wash);border-left:4px solid var(--ink)}
+.verdict.none{background:#FDF0EC;border-left:4px solid var(--hot)}
+.verdict.req {background:#EDF6F0;border-left:4px solid var(--ok)}
+.verdict.tree{background:var(--wash);border-left:4px solid var(--line)}
+.verdict b{font-weight:600}
+.others{border-top:1px solid var(--line);margin-top:1.1rem;padding-top:.3rem}
+.others .olabel{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;margin:.6rem 0 .2rem}
+.sclose{
+  position:absolute;top:.6rem;right:.7rem;background:none;border:0;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;padding:.4rem;
+}
 
 /* a note about what is actually on the ground — several pits, a stump left
    in place — kept next to the report it belongs to */
@@ -344,6 +381,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-size:1.2rem;line-height:1.1;text-transform:uppercase;margin:0 0 .3rem;
 }
 .task .tm{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);line-height:1.6}
+/* the city's own record catching up with you */
+.city{font-family:'IBM Plex Mono',monospace;font-size:.64rem;line-height:1.6;
+  color:var(--ok);margin:.35rem 0 0}
+.city b{font-weight:600}
+#detail .city{margin:0 0 1rem}
 .steps{
   font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--dim);
   margin:.8rem 0 0;padding-left:1.1rem;line-height:1.8;
@@ -482,6 +524,14 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
           <!-- one thumb-sized control: find you the first time, put you back
                in the middle every time after, for checking sites on the move -->
           <button class="recenter aimbtn" id="mecenter" aria-label="Center the map on my location"></button>
+          <!-- photograph a stump and let the location do the looking up -->
+          <button class="recenter aimbtn shotbtn" id="shotbtn" aria-label="Check a photo of a stump">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 8h3.5L8 5.5h8L17.5 8H21v12H3z" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="12" cy="13.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
         </div>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
@@ -496,6 +546,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 
     <section id="detail" class="scroller" hidden></section>
     <div class="dock" id="dock" hidden></div>
+    <div class="sheetwrap" id="photosheet" hidden></div>
+    <!-- no capture attribute: iOS then offers the camera *and* the library,
+         and a library photo brings its own coordinates with it -->
+    <input type="file" id="shotfile" accept="image/*" hidden>
 
     <section id="tasks" class="scroller" hidden>
       <button class="back" id="backsites">‹ All sites</button>
@@ -509,7 +563,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <p class="note">
         Data: Chicago 311 service requests, queried live from the city open data portal.
         A site appears when a Tree Removal Inspection closed as Completed in the last six
-        months and no Tree Planting Request has been filed at that address since.<br>
+        months and no Tree Planting Request has been filed at that address since.
+        Anything you have reported stays on the list after that, so filing a request
+        does not erase the record of having filed it.<br>
         <span id="storagenote">Your reports are stored on this device.</span><br>
         <span id="stamp"></span>
       </p>
@@ -594,6 +650,14 @@ function paintSync(){
 }
 
 async function saveMarks(){
+  // Every report carries enough of its site to be rebuilt without the city.
+  // Done here rather than at each call site so no future write can forget it.
+  for (const id of Object.keys(marks)){
+    if (marks[id] && !marks[id].site){
+      const s = SITES.find(x => x.id === id);
+      if (s) marks[id].site = snapshot(s);
+    }
+  }
   await Store.set('stump.marks', JSON.stringify(marks));
   dirty = true;
   await pushMarks();
@@ -719,24 +783,81 @@ async function loadSites(){
     if (!byAddr[k] || r.closed_date > byAddr[k].closed_date) byAddr[k] = r;
   }
 
-  const sites = [];
+  const sites = [], confirmed = {};
   for (const k in byAddr){
     const r = byAddr[k];
     const reqs = plant[k] || [];
-    if (reqs.some(p => p.created_date > r.closed_date || p.status === 'Open')) continue;
-    const street = titleCase([r.street_direction, r.street_name, r.street_type].filter(Boolean).join(' '));
-    sites.push({
-      id: r.sr_number,
-      num: parseInt(r.street_number,10) || 0,
-      street,
-      sortKey: (r.street_name||'').toUpperCase() + ' ' + String(parseInt(r.street_number,10)||0).padStart(6,'0'),
-      address: r.street_number+' '+street,
-      zip: r.zip_code || '60657',
-      lat: +r.latitude, lng: +r.longitude,
-      closed: r.closed_date
-    });
+    const asked = reqs
+      .filter(p => p.created_date > r.closed_date || p.status === 'Open')
+      .sort((a,b) => (a.created_date||'').localeCompare(b.created_date||''));
+    const site = siteFrom(r);
+    if (asked.length){
+      /* A tree has been asked for here — most likely by you, an hour ago.
+         This used to be a `continue`, which is why filing a request deleted
+         the record of having filed it. Keep the site and the city's proof. */
+      confirmed[site.id] = { ...site,
+        plantedAt: asked[0].created_date, plantSr: asked[0].sr_number };
+      continue;
+    }
+    sites.push(site);
   }
-  return sites;
+  return { sites, confirmed };
+}
+
+/* One removal row from the city, in the shape the app uses. */
+function siteFrom(r){
+  const street = titleCase([r.street_direction, r.street_name, r.street_type].filter(Boolean).join(' '));
+  return {
+    id: r.sr_number,
+    num: parseInt(r.street_number,10) || 0,
+    street,
+    sortKey: (r.street_name||'').toUpperCase() + ' ' + String(parseInt(r.street_number,10)||0).padStart(6,'0'),
+    address: r.street_number+' '+street,
+    zip: r.zip_code || '60657',
+    lat: +r.latitude, lng: +r.longitude,
+    closed: r.closed_date
+  };
+}
+
+/* Enough of a site to rebuild it from the report alone, stored with every
+   mark. The city's list is a moving window; your own record should not be. */
+function snapshot(s){
+  return { address:s.address, sortKey:s.sortKey, zip:s.zip,
+           lat:s.lat, lng:s.lng, closed:s.closed };
+}
+
+/* Your reports outlive the city's open list. A site drops out of that list
+   the moment a planting request exists at the address — filing one does
+   exactly that — and the query only looks back six months besides. Anything
+   you have reported goes back in: from the city's own row where it still has
+   one, from the snapshot stored with your report where it does not. */
+function withReported(live, confirmed){
+  const have = new Set(live.map(s => s.id));
+  const extra = [];
+  for (const id of Object.keys(marks)){
+    if (have.has(id)) continue;
+    if (confirmed[id]){ extra.push({ ...confirmed[id], archived:true }); continue; }
+    const snap = marks[id].site;
+    if (!snap || !Number.isFinite(+snap.lat) || !Number.isFinite(+snap.lng)) continue;
+    extra.push({ id, num:0, street:'', archived:true, ...snap, lat:+snap.lat, lng:+snap.lng });
+  }
+  return live.concat(extra);
+}
+
+/* Reports made before snapshots existed: ask the city about those request
+   numbers directly, outside the ward-and-date query, so work already done
+   comes back instead of staying lost. */
+async function recoverLost(ids){
+  const list = ids.slice(0,200)
+    .map(id => `'${String(id).replace(/[^A-Za-z0-9-]/g,'')}'`).join(',');
+  if (!list) return [];
+  try{
+    const rows = await soda(`sr_number in(${list})`,
+      'sr_number,street_number,street_direction,street_name,street_type,zip_code,latitude,longitude,closed_date',
+      250);
+    return rows.filter(r => r.latitude && r.longitude)
+               .map(r => ({ ...siteFrom(r), archived:true }));
+  }catch(e){ return []; }
 }
 
 /* ============================================================
@@ -1030,6 +1151,187 @@ function renderMap(list){
 }
 
 /* ============================================================
+   PHOTO CHECK
+   ============================================================
+   Photograph a stump; the coordinates say which removal record it is and
+   whether a tree has already been asked for there. A photo from the library
+   usually carries its own GPS tag, which is the more accurate answer since
+   it is where you stood when you took it; a photo straight from the camera
+   normally has that stripped by the browser, so we fall back to where you
+   are now — which, standing at the stump, is the same place. */
+
+/* GPS out of a JPEG's Exif block. ~40 lines beats a CDN dependency, and
+   every read is bounds-checked: a truncated or odd file returns null and
+   the caller falls back to your live position. */
+function exifGPS(buf){
+  try{
+    const v = new DataView(buf);
+    if (v.byteLength < 16 || v.getUint16(0) !== 0xFFD8) return null;   // not a JPEG
+    let off = 2;
+    while (off + 4 <= v.byteLength){
+      if (v.getUint8(off) !== 0xFF) return null;
+      const marker = v.getUint8(off + 1), size = v.getUint16(off + 2);
+      if (marker === 0xDA || size < 2) return null;                    // image data starts
+      if (marker === 0xE1 && off + 10 <= v.byteLength &&
+          v.getUint32(off + 4) === 0x45786966){                        // 'Exif'
+        return tiffGPS(v, off + 10);
+      }
+      off += 2 + size;
+    }
+  }catch(e){}
+  return null;
+}
+
+function tiffGPS(v, base){
+  const end = v.byteLength;
+  if (base + 8 > end) return null;
+  const le = v.getUint16(base) === 0x4949;
+  const u16 = o => (o + 2 <= end ? v.getUint16(o, le) : 0);
+  const u32 = o => (o + 4 <= end ? v.getUint32(o, le) : 0);
+  if (u16(base + 2) !== 42) return null;
+
+  const ifd0 = base + u32(base + 4);
+  let gps = 0;
+  const n0 = u16(ifd0);
+  for (let i = 0; i < n0 && ifd0 + 2 + i*12 + 12 <= end; i++){
+    const e = ifd0 + 2 + i*12;
+    if (u16(e) === 0x8825) gps = base + u32(e + 8);   // the GPS sub-IFD
+  }
+  if (!gps || gps + 2 > end) return null;
+
+  const three = o => {
+    const out = [];
+    for (let k = 0; k < 3; k++){
+      const den = u32(o + k*8 + 4);
+      if (!den) return null;
+      out.push(u32(o + k*8) / den);
+    }
+    return out;
+  };
+  let lat = null, lng = null, latRef = 'N', lngRef = 'E';
+  const n = u16(gps);
+  for (let i = 0; i < n && gps + 2 + i*12 + 12 <= end; i++){
+    const e = gps + 2 + i*12;
+    const tag = u16(e), type = u16(e + 2), count = u32(e + 4);
+    // rationals never fit the 4-byte slot, so they are always a pointer
+    const at = type === 5 ? base + u32(e + 8) : e + 8;
+    if (tag === 1) latRef = String.fromCharCode(v.getUint8(e + 8));
+    else if (tag === 3) lngRef = String.fromCharCode(v.getUint8(e + 8));
+    else if (tag === 2 && count === 3) lat = three(at);
+    else if (tag === 4 && count === 3) lng = three(at);
+  }
+  if (!lat || !lng) return null;
+  const dms = a => a[0] + a[1]/60 + a[2]/3600;
+  const out = { lat: dms(lat) * (latRef === 'S' ? -1 : 1),
+                lng: dms(lng) * (lngRef === 'W' ? -1 : 1) };
+  if (!Number.isFinite(out.lat) || !Number.isFinite(out.lng)) return null;
+  if (Math.abs(out.lat) > 90 || Math.abs(out.lng) > 180) return null;
+  return out;
+}
+
+let shot = null;   // { url, at:{lat,lng}, from:'photo'|'you' }
+
+async function checkPhoto(file){
+  if (!file) return;
+  let at = null, from = 'you';
+  try{
+    const gps = exifGPS(await file.arrayBuffer());
+    if (gps){ at = gps; from = 'photo'; }
+  }catch(e){}
+  if (!at && me) at = { lat: me.lat, lng: me.lng };
+  if (!at){
+    toast('That photo has no location saved. Tap the crosshair to find yourself, then try again.');
+    return;
+  }
+  closeShot();
+  shot = { url: URL.createObjectURL(file), at, from };
+  renderShot();
+}
+
+function closeShot(){
+  if (shot && shot.url) URL.revokeObjectURL(shot.url);
+  shot = null;
+  const el = $('#photosheet');
+  if (el){ el.hidden = true; el.innerHTML = ''; }
+}
+
+/* The answer, in the order it is wanted: which pit is this, has a request
+   already gone in, and if not, the one tap that makes it a task. */
+const VERDICT = {
+  open: 'No planting request on record here. Nobody has asked for a tree yet.',
+  none: 'Already reported as empty — a filing task is waiting for you.',
+  req:  'A planting request has been filed for this pit.',
+  tree: 'This one was marked as still having a tree.'
+};
+
+function renderShot(){
+  const el = $('#photosheet');
+  if (!el || !shot) return;
+  const near = SITES
+    .map(s => ({ s, mi: miles(shot.at, s) }))
+    .sort((a,b) => a.mi - b.mi)
+    .slice(0, 4);
+  const hit = near[0];
+
+  const body = !hit
+    ? `<p class="msg">No removal records loaded yet.</p>`
+    : hit.mi > 0.114   /* 600 ft — past that, this is not the same pit */
+    ? `<h3>Nothing on record here</h3>
+       <p class="sdist">The nearest removal the city lists is
+         ${esc(hit.s.address)}, ${dist(hit.mi)} away. Stump made a record of the
+         removal, so a pit with no removal request behind it isn't one it can file for.</p>
+       ${others(near.slice(0,3))}`
+    : (() => {
+        const s = hit.s, st = stateOf(s), m = marks[s.id] || {};
+        const action = st === 'open'
+          ? `<div class="btnrow">
+               <button class="mini fill" data-mark="${esc(s.id)}::none">No tree — make a task</button>
+               <button class="mini ghost" data-mark="${esc(s.id)}::tree">Tree is here</button>
+             </div>`
+          : st === 'none'
+          ? `<div class="btnrow">
+               <button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>
+               <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+             </div>`
+          : `<div class="btnrow">
+               <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+             </div>`;
+        return `<h3>${esc(s.address)}</h3>
+          <p class="sdist">${dist(hit.mi)} from the photo · removal ${esc(s.id)}
+            closed ${ago(s.closed)}</p>
+          <div class="verdict ${st}">${VERDICT[st]}${
+            st === 'req' && m.sr ? ` <b>${esc(m.sr)}</b>` : ''}</div>
+          ${action}
+          ${others(near.slice(1,3))}`;
+      })();
+
+  el.innerHTML = `<div class="sheet">
+    <button class="sclose" id="shotclose">Close</button>
+    <div class="shead">
+      <img class="shot" src="${shot.url}" alt="">
+      <p class="sfrom">${shot.from === 'photo'
+        ? 'Located from the photo itself'
+        : 'The photo had no location — using where you are now'}</p>
+    </div>
+    ${body}
+  </div>`;
+  el.hidden = false;
+}
+
+function others(list){
+  if (!list.length) return '';
+  return `<div class="others"><p class="olabel">Other pits nearby</p>
+    ${list.map(({s,mi}) => {
+      const [cls,label] = PILL[stateOf(s)];
+      return `<button class="row" data-open="${esc(s.id)}">
+        <span class="rmain"><span class="raddr">${esc(s.address)}</span>
+          <span class="rmeta">${dist(mi)} away</span></span>
+        ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
+        <span class="chev">›</span></button>`;
+    }).join('')}</div>`;
+}
+
+/* ============================================================
    NOTES
    ============================================================ */
 /* What the address alone can't say: several empty pits at one number, a
@@ -1039,6 +1341,15 @@ const NOTE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M5 4h14v13l-4 4H5z" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linejoin="round"/>
   <path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+/* The city's record catching up with you: a planting request now exists at
+   this address. On a filed task that is proof it landed; on one still
+   waiting, a sign that someone got there first. */
+function cityLine(s){
+  if (!s || !s.plantedAt) return '';
+  return `<p class="city">City record: planting request${
+    s.plantSr ? ` <b>${esc(s.plantSr)}</b>` : ''} opened ${longDate(s.plantedAt)}.</p>`;
+}
 
 function noteBlock(id){
   const saved = (marks[id] && marks[id].note) || '';
@@ -1110,6 +1421,7 @@ function renderDetail(){
     </div>
 
     ${banner}
+    ${cityLine(s)}
     ${noteBlock(s.id)}
     <div class="mapbox">
       <div id="minimap"></div>
@@ -1238,6 +1550,7 @@ function renderTasks(){
       <h3>${esc(s.address)}</h3>
       <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''} ·
         removal ${s.id} closed ${longDate(s.closed)}</p>
+      ${cityLine(s)}
       ${noteBlock(s.id)}
       ${isDone ? `
         <p class="tm">${marks[s.id].sr
@@ -1325,6 +1638,15 @@ document.addEventListener('click', async e => {
     return;
   }
 
+  if (e.target.closest('#shotbtn')){
+    const inp = $('#shotfile');
+    if (inp){ inp.value = ''; inp.click(); }
+    return;
+  }
+  // the backdrop counts as a dismissal; the sheet itself does not
+  if (e.target.closest('#shotclose') ||
+      (e.target.id === 'photosheet' && shot)){ closeShot(); return; }
+
   if (e.target.closest('#sortbtn')){
     const panel = $('#sortpanel');
     const openNow = panel.hidden;
@@ -1368,12 +1690,12 @@ document.addEventListener('click', async e => {
   }
 
   const open = e.target.closest('[data-open]');
-  if (open){ detailId = open.dataset.open; tab = 'browse'; repaint(); window.scrollTo(0,0); return; }
+  if (open){ closeShot(); detailId = open.dataset.open; tab = 'browse'; repaint(); window.scrollTo(0,0); return; }
 
   if (e.target.closest('#back')){ detailId = null; repaint(); return; }
 
   const goto = e.target.closest('[data-goto-task]');
-  if (goto){ tab = 'tasks'; detailId = null; repaint(); return; }
+  if (goto){ closeShot(); tab = 'tasks'; detailId = null; repaint(); return; }
 
   const nb = e.target.closest('[data-note]');
   if (nb){
@@ -1390,6 +1712,10 @@ document.addEventListener('click', async e => {
   const mk = e.target.closest('[data-mark]');
   if (mk){
     const [id, st] = mk.dataset.mark.split('::');
+    // answering from the photo sheet is the same decision as answering on
+    // the site's own card, so it lands in the same place
+    const fromShot = !!mk.closest('#photosheet');
+    if (fromShot) closeShot();
     const prev = marks[id] || {};
     marks[id] = { state: st, at: new Date().toISOString() };
     // a note describes the site, not the answer, so it outlives a re-report
@@ -1400,7 +1726,7 @@ document.addEventListener('click', async e => {
     lastUndo = null;
     await saveMarks();
     // reporting "no tree" is the moment a task is born — take them to it
-    if (st === 'none' && detailId === id){ tab = 'tasks'; detailId = null; }
+    if (st === 'none' && (detailId === id || fromShot)){ tab = 'tasks'; detailId = null; }
     repaint();
     return;
   }
@@ -1502,6 +1828,12 @@ document.addEventListener('submit', async e => {
   repaint();
 });
 
+document.addEventListener('change', e => {
+  if (e.target.id !== 'shotfile') return;
+  const file = e.target.files && e.target.files[0];
+  if (file) checkPhoto(file);
+});
+
 let qt;
 document.addEventListener('input', e => {
   // hold what is typed, so a sync pull re-rendering the card can't wipe it
@@ -1573,10 +1905,25 @@ function fallbackCopy(text, done){
   watchForRemoteEdits();
 
   try{
-    SITES = await loadSites();
+    const { sites, confirmed } = await loadSites();
+    SITES = withReported(sites, confirmed);
+
+    // Anything still missing was reported before snapshots existed. Ask the
+    // city about those request numbers by name; this runs once, because the
+    // snapshot written below means they are never lost again.
+    const lost = Object.keys(marks).filter(id => !SITES.some(s => s.id === id));
+    if (lost.length) SITES = SITES.concat(await recoverLost(lost));
+
+    let grew = false;
+    for (const id of Object.keys(marks)){
+      const s = SITES.find(x => x.id === id);
+      if (s && !marks[id].site){ marks[id].site = snapshot(s); grew = true; }
+    }
+    if (grew){ await Store.set('stump.marks', JSON.stringify(marks)); await pushMarks(); }
+
     $('#tasksbtn').hidden = false;
     $('#stamp').textContent = 'Loaded ' + new Date().toLocaleString('en-US',
-      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' · ' + SITES.length + ' sites';
+      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' · ' + sites.length + ' sites';
 
     // ?site=SR123 — someone was sent here to check one specific address.
     // "New here" has to be a fact about this device: the shared store means
