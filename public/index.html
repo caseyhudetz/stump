@@ -106,6 +106,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .count{font-family:'IBM Plex Mono',monospace;font-size:.63rem;color:var(--dim);
   text-transform:uppercase;letter-spacing:.08em;margin:0 0 .6rem}
+.countrow{margin-bottom:.6rem}
 
 /* ---------- list ---------- */
 .row{
@@ -140,12 +141,35 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-family:'IBM Plex Mono',monospace;font-size:.56rem;
   text-transform:uppercase;letter-spacing:.06em;color:var(--dim);opacity:.7;
 }
-.menear{
-  font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);
-  margin:0 0 .55rem;line-height:1.6;min-height:1.1rem;
+/* the count and the locate control share one row, so neither costs a line */
+.countrow{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.countrow .count{margin:0}
+.menear{flex:0 0 auto;display:flex;align-items:center}
+.aim{
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:none;border:0;padding:.15rem 0;cursor:pointer;color:var(--dim);
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
 }
-.menear.on{color:var(--ink)}
-.menear.quiet{color:var(--dim)}
+.aim svg{width:1.15rem;height:1.15rem;flex:0 0 auto}
+.aim.on{color:#0E6FD8}
+.aim.busy{color:var(--dim);opacity:.6;animation:pulse 1.2s ease-in-out infinite}
+.aim b{font-weight:600}
+.aim:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+@keyframes pulse{50%{opacity:.25}}
+
+/* transient news, taking no permanent room */
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%) translateY(.75rem);
+  bottom:calc(1.5rem + env(safe-area-inset-bottom));z-index:2000;
+  max-width:min(26rem,calc(100vw - 2rem));
+  background:var(--ink);color:var(--paper);
+  padding:.8rem 1rem;border-radius:.4rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.55;
+  box-shadow:0 6px 20px rgba(0,0,0,.3);
+  opacity:0;transition:opacity .22s ease,transform .22s ease;
+  pointer-events:none;
+}
+.toast.up{opacity:1;transform:translateX(-50%) translateY(0)}
 .melink{
   background:none;border:0;padding:0;cursor:pointer;text-align:left;
   font:inherit;color:var(--ink);
@@ -365,6 +389,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 </head>
 <body>
 
+<div class="toast" id="toast" hidden></div>
+
 <div class="app">
   <div class="topbar">
     <div class="brandrow">
@@ -416,10 +442,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <section id="browse" class="pane">
       <div class="scroller">
       <div id="guestnote"></div>
-      <p class="count" id="count"></p>
+      <div class="countrow">
+        <p class="count" id="count"></p>
+        <span id="mebar" class="menear"></span>
+      </div>
       <div id="list"></div>
       <div id="mapwrap" hidden>
-        <p id="mebar" class="menear"></p>
         <div id="map"></div>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
@@ -714,7 +742,7 @@ let me = null, meAcc = null, meWatch = null;
 let meState = 'idle';      // idle | finding | on | blocked | unavailable | unsupported
 
 function findMe(){
-  if (!navigator.geolocation){ meState = 'unsupported'; paintMe(); return; }
+  if (!navigator.geolocation){ meState = 'unsupported'; paintMe(); toast('This browser has no location support.'); return; }
   if (meWatch !== null) navigator.geolocation.clearWatch(meWatch);
   const asked = Date.now();
   meState = 'finding'; paintMe();
@@ -732,6 +760,10 @@ function findMe(){
       meState = err.code === 1 ? 'blocked' : 'unavailable';
       meFast = err.code === 1 && Date.now() - asked < 1000;
       paintMe();
+      toast(err.code === 1
+        ? (meFast ? 'Location is blocked for this site in Safari settings.'
+                  : 'Location permission was refused.')
+        : 'No position yet — signal may be weak.');
     },
     { enableHighAccuracy:true, maximumAge:10000, timeout:20000 }
   );
@@ -746,10 +778,14 @@ function nearestUnchecked(){
   return open.reduce((a,b) => miles(me,b) < miles(me,a) ? b : a);
 }
 
-/* Location is a one-time grant, so the ask should appear once and never
-   again. Granted, the line just reports what is nearest; refused, it says
-   so quietly and offers a retry. Either way it is one line, not a control
-   parked on the map. */
+const AIM = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+/* Location is a grant asked for once, and it rides on the count row so it
+   never costs a line of its own. Granted, it reports how far the nearest
+   site is; anything gone wrong is a toast, not permanent furniture. */
 function paintMe(){
   const el = $('#mebar'); if (!el) return;
 
@@ -757,26 +793,34 @@ function paintMe(){
     const n = nearestUnchecked();
     el.className = 'menear on';
     el.innerHTML = n
-      ? `<button class="melink" data-open="${esc(n.id)}">
-           <b>${dist(miles(me,n))}</b> to ${esc(n.address)} →</button>`
-      : `Nothing left to check nearby`;
+      ? `<button class="aim on" data-open="${esc(n.id)}"
+                 aria-label="Nearest unchecked: ${esc(n.address)}, ${dist(miles(me,n))}">
+           ${AIM}<b>${dist(miles(me,n))}</b></button>`
+      : `<span class="aim on" aria-label="You are on the map">${AIM}</span>`;
     return;
   }
   if (meState === 'finding'){
-    el.className = 'menear'; el.innerHTML = `<span class="spin">◍</span> Finding you…`; return;
-  }
-  if (meState === 'idle'){
     el.className = 'menear';
-    el.innerHTML = `<button class="melink" id="findme">Show my location</button>`;
+    el.innerHTML = `<span class="aim busy" aria-label="Finding you">${AIM}</span>`;
     return;
   }
-  el.className = 'menear quiet';
-  el.innerHTML = {
-    blocked: `Location is off for this site · `,
-    unavailable: `No position yet · `,
-    unsupported: `No location in this browser`
-  }[meState] + (meState === 'unsupported' ? ''
-      : `<button class="melink" id="findme">try again</button>`);
+  if (meState === 'unsupported'){ el.className = 'menear'; el.innerHTML = ''; return; }
+
+  el.className = 'menear';
+  el.innerHTML = `<button class="aim" id="findme" aria-label="Show my location">${AIM}</button>`;
+}
+
+let toastTimer = null;
+function toast(msg){
+  const el = $('#toast'); if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('up'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove('up');
+    setTimeout(() => { el.hidden = true; }, 250);
+  }, 4200);
 }
 
 const dist = mi => mi * 5280 < 1000
