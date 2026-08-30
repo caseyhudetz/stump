@@ -73,8 +73,9 @@ body{
 .panel.sheet.up{transform:translateY(0)}
 .ptitle{
   font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
-  font-size:1.15rem;margin:.2rem 0 .9rem;
+  font-size:1.15rem;margin:.2rem 0 .15rem;
 }
+.panel .count{margin:0 0 .9rem}
 .plabel{
   font-family:'IBM Plex Mono',monospace;font-size:.58rem;
   text-transform:uppercase;letter-spacing:.11em;color:var(--dim);margin:0 0 .45rem;
@@ -212,7 +213,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 #map{height:100%;min-height:200px;width:100%;border:1px solid var(--line);background:var(--wash)}
 .legend{
   flex:0 0 auto;
-  display:flex;gap:.7rem;flex-wrap:wrap;padding:0;
+  display:flex;gap:1rem;flex-wrap:wrap;padding:.15rem 0 0;
   font-family:'IBM Plex Mono',monospace;font-size:.56rem;
   text-transform:uppercase;letter-spacing:.06em;color:var(--dim);opacity:.7;
 }
@@ -292,9 +293,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
      whole 20px square answers a thumb rather than just the visible circle */
   pointer-events:none;
 }
-.pin.none{background:var(--hot)}
-.pin.req {background:var(--ok)}
-.pin.tree{background:#B8B6AE;width:.8rem;height:.8rem;margin:.1rem;opacity:.85}
+/* checked: hollow, so it recedes without disappearing */
+.pin.done{background:var(--paper);border-color:var(--dim);box-shadow:0 1px 3px rgba(11,11,12,.3)}
+.pin.done::after{
+  content:'';display:block;width:.34rem;height:.34rem;border-radius:50%;
+  background:var(--dim);margin:.29rem auto;
+}
 .pin.plant{background:#C87A16}
 /* checked, empty, and already in the city's queue — amber, but ringed so
    it reads apart from the request pins themselves */
@@ -401,7 +405,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
    it. A hidden one collapses out of the column on its own. */
 /* anchored to the pane, not the map, so the filter is there in list view */
 .mapctls{
-  position:absolute;right:1.35rem;bottom:3.4rem;z-index:1200;
+  position:absolute;right:1.35rem;bottom:5.4rem;z-index:1200;
   display:flex;flex-direction:column-reverse;gap:.5rem;
   transition:transform .26s cubic-bezier(.2,.8,.3,1),opacity .18s;
 }
@@ -443,7 +447,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
    the page appears from underneath your finger as it goes. */
 .pitsheet{
   --peek:240px;
-  position:fixed;left:0;right:0;bottom:0;z-index:1400;height:92dvh;
+  position:fixed;left:0;right:0;bottom:0;z-index:1400;height:60dvh;
+  max-height:92dvh;
   display:flex;flex-direction:column;
   background:var(--paper);border-top:1px solid var(--line);
   border-radius:1rem 1rem 0 0;
@@ -709,10 +714,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <section id="browse" class="pane">
       <div class="browsefit">
       <div id="guestnote"></div>
-      <div class="countrow">
-        <p class="count" id="count"></p>
-        <span id="mebar" class="menear"></span>
-      </div>
           <!-- One stack, bottom-up, on the map rather than in a bar above it.
            A hidden control collapses out of the stack by itself. -->
       <div class="mapctls">
@@ -741,11 +742,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </div>
         <!-- .plants swaps the key over when the planting-request filter is on -->
         <div class="legend" id="legend">
-          <span class="lsite"><i class="pin open"></i>Unchecked</span>
-          <span class="lsite"><i class="pin none"></i>No tree</span>
-          <span class="lsite"><i class="pin req"></i>Filed</span>
-          <span class="lsite"><i class="pin tree"></i>Has tree</span>
-          <span class="lsite"><i class="pin wait"></i>In queue</span>
+          <span class="lsite"><i class="pin open"></i>Not checked</span>
+          <span class="lsite"><i class="pin done"></i>Checked</span>
           <span class="lplant"><i class="pin plant"></i>Requested, not planted</span>
           <span><i class="pin me"></i>You</span>
         </div>
@@ -762,6 +760,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         <div class="grip"></div>
         <button class="sclose" id="sortclose" aria-label="Close">×</button>
         <h3 class="ptitle">Show on map</h3>
+        <p class="count" id="count"></p>
 
         <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
         <p class="plabel">View</p>
@@ -1407,27 +1406,6 @@ function paintMe(){
     btn.hidden = !show;
   }
 
-  const el = $('#mebar'); if (!el) return;
-
-  if (meState === 'on' && me){
-    const n = nearestUnchecked();
-    el.className = 'menear on';
-    el.innerHTML = n
-      ? `<button class="aim on" data-open="${esc(n.id)}"
-                 aria-label="Nearest unchecked: ${esc(n.address)}, ${dist(miles(me,n))}">
-           ${AIM}<b>${dist(miles(me,n))}</b></button>`
-      : `<span class="aim on" aria-label="You are on the map">${AIM}</span>`;
-    return;
-  }
-  if (meState === 'finding'){
-    el.className = 'menear';
-    el.innerHTML = `<span class="aim busy" aria-label="Finding you">${AIM}</span>`;
-    return;
-  }
-  if (meState === 'unsupported'){ el.className = 'menear'; el.innerHTML = ''; return; }
-
-  el.className = 'menear';
-  el.innerHTML = `<button class="aim" id="findme" aria-label="Show my location">${AIM}</button>`;
 }
 
 let toastTimer = null;
@@ -1461,6 +1439,11 @@ const byId = id => SITES.find(s => s.id === id);
 const tasks = () => SITES.filter(s => stateOf(s) === 'none')
                          .sort((a,b) => (marks[b.id].at||'').localeCompare(marks[a.id].at||''));
 const doneTasks = () => SITES.filter(s => stateOf(s) === 'req')
+                         .sort((a,b) => (marks[b.id].at||'').localeCompare(marks[a.id].at||''));
+/* Everywhere you went that produced no filing — a tree was there, or the
+   city already had it. Nothing to do with these, but the walk is only
+   worth anything if it is written down. */
+const reviewed = () => SITES.filter(s => ['tree','wait'].includes(stateOf(s)))
                          .sort((a,b) => (marks[b.id].at||'').localeCompare(marks[a.id].at||''));
 
 function filtered(){
@@ -1670,9 +1653,13 @@ function pinIcon(kind){
 /* Every pin the map draws, from whatever it is drawing. Tapping one raises
    the sheet rather than a popup: a popup can't hold the decision, and on a
    phone it lands wherever the pin happens to be. */
+/* The map says whether you have looked at a pit, and nothing else. What you
+   found is on the card and in the record — putting five colours on the map
+   asked you to decode it before you could read it. */
 function siteSpecs(list){
   return list.map(s => ({
-    id: s.id, lat: s.lat, lng: s.lng, kind: stateOf(s)
+    id: s.id, lat: s.lat, lng: s.lng,
+    kind: stateOf(s) === 'open' ? 'open' : 'done'
   }));
 }
 
@@ -1745,10 +1732,24 @@ function quietRow(s){
     </div>`;
 }
 
+/* The facts are short enough to just be there. A disclosure asked you to
+   open something before you could see four lines. */
+function banners(s){
+  const st = stateOf(s), m = marks[s.id], when = m && m.at;
+  const b = st === 'none' ? `<div class="state none">
+        Reported <b>no tree</b> ${when?ago(when):''} — a task is waiting for you under <b>Tasks</b>.</div>`
+    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}${
+        m && m.sr ? ` · <b>${esc(m.sr)}</b>` : ''}.</div>`
+    : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
+    : st === 'wait' ? `<div class="state wait">Empty, and <b>already in the city's queue</b>
+        ${when?'as of '+ago(when):''}.${staleWait(s)}</div>`
+    : '';
+  return b + cityLine(s);
+}
+
 function factsList(s){
   const st = stateOf(s), m = marks[s.id], when = m && m.at;
-  return `<details class="more"${detailsOpen ? ' open' : ''}>
-      <summary>Details</summary>
+  return `<div class="more open">
       <dl class="facts">
         <div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
         <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>
@@ -1759,9 +1760,7 @@ function factsList(s){
         <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
         <div class="fact"><dt>From ${me ? 'you' : 'home'}</dt><dd>${(me?miles(me,s):miles(HOME,s)).toFixed(2)} mi</dd></div>
       </dl>
-      <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
-        <button class="linkish js-setname">${reporter ? 'change' : 'add your name'}</button></p>
-    </details>`;
+    </div>`;
 }
 
 /* ============================================================
@@ -1943,11 +1942,11 @@ function renderSheet(){
         ${decision}
       </div>
       <div class="restpart">
-        ${quietRow(s)}
+        ${banners(s)}
         ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
-        ${noteBlock(s.id)}
         ${factsList(s)}
-        <button class="expand" data-open="${esc(s.id)}">Open the full page ›</button>
+        ${noteBlock(s.id)}
+        ${quietRow(s)}
       </div>
     </div>`;
   el.hidden = false;
@@ -1962,8 +1961,16 @@ function measurePeek(){
   const zone = el.querySelector('.dragzone');
   const peek = el.querySelector('.peekpart');
   if (!zone) return;
-  const h = Math.min(zone.offsetHeight + (peek ? peek.offsetHeight : 0) + 20,
-                     Math.round(innerHeight * 0.6));
+  /* The card is as tall as it needs to be, up to most of the screen: a
+     short site should not open onto a screenful of blank paper. */
+  const body = el.querySelector('.sheetbody');
+  const pad = 26 + (parseFloat(getComputedStyle(el).paddingBottom) || 0);
+  const peekH = Math.min(zone.offsetHeight + (peek ? peek.offsetHeight : 0) + 20,
+                         Math.round(innerHeight * 0.6));
+  const wanted = zone.offsetHeight + (body ? body.scrollHeight : 0) + pad;
+  el.style.height = Math.round(Math.min(Math.max(wanted, peekH + 90),
+                                        innerHeight * 0.92)) + 'px';
+  const h = peekH;
   el.style.setProperty('--peek', h + 'px');
   // the map's own controls sit above the card rather than under it
   document.documentElement.style.setProperty('--peek', h + 'px');
@@ -2086,7 +2093,8 @@ function closeShot(){
 
 /* The answer, once you have said which pit it is. */
 const VERDICT = {
-  open: 'No planting request on record here. Nobody has asked for a tree yet.',
+  open: 'Nothing has been reported here yet, and no planting request is on ' +
+        'record. Say the pit is empty and the filing task is written for you.',
   none: 'Already reported as empty — a filing task is waiting for you.',
   req:  'A planting request has been filed for this pit.',
   tree: 'This one was marked as still having a tree.'
@@ -2163,9 +2171,11 @@ function renderShot(){
 
 function verdictFor(hit, rest){
   const s = hit.s, st = stateOf(s), m = marks[s.id] || {};
+  const near = nearbyRequests(s);
   const action = st === 'open'
     ? `<div class="btnrow">
-         <button class="mini fill" data-mark="${esc(s.id)}::none">No tree — make a task</button>
+         <button class="mini fill" ${near.length ? `data-choose="${esc(s.id)}"`
+           : `data-mark="${esc(s.id)}::none"`}>No tree — make the task</button>
          <button class="mini ghost" data-mark="${esc(s.id)}::tree">Tree is here</button>
        </div>`
     : st === 'none'
@@ -2251,15 +2261,6 @@ function renderDetail(){
   const m = marks[s.id];
   const when = m && m.at;
 
-  const banner = st === 'none' ? `<div class="state none">
-        Reported <b>no tree</b> ${when?ago(when):''} — a task is waiting for you under <b>Tasks</b>.</div>`
-    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}${
-        m && m.sr ? ` · <b>${esc(m.sr)}</b>` : ''}.</div>`
-    : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
-    : st === 'wait' ? `<div class="state wait">Empty, and <b>already in the city's queue</b>
-        ${when?'as of '+ago(when):''}.${staleWait(s)}</div>`
-    : '';
-
   // "no tree" where a request is already open is a question, not an answer
   const asksFirst = nearbyRequests(s).length > 0;
   const choices = choosing === s.id ? chooserBlock(s)
@@ -2299,31 +2300,16 @@ function renderDetail(){
         </svg>Ask someone</button>
     </div>
 
-    ${banner}
-    ${cityLine(s)}
+    ${banners(s)}
     ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
-    ${noteBlock(s.id)}
     <div class="mapbox">
       <div id="minimap"></div>
       <button class="recenter" id="recenter">Recenter</button>
     </div>
 
-    <details class="more"${detailsOpen ? ' open' : ''}>
-      <summary>Details</summary>
-      <dl class="facts">
-        <div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
-        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>
-        ${st === 'req' ? `<div class="fact"><dt>Planting request</dt><dd>${
-          m && m.sr ? esc(m.sr) : '<span class="nosr">not recorded</span>'}</dd></div>
-        <div class="fact"><dt>Filed</dt><dd>${when ? longDate(when)+' · '+ago(when) : '—'}</dd></div>` : ''}
-        ${st === 'none' && when ? `<div class="fact"><dt>Gap confirmed</dt><dd>${longDate(when)}${
-          m && m.by ? ' · '+esc(m.by) : ''}</dd></div>` : ''}
-        <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
-        <div class="fact"><dt>From ${me ? 'you' : 'home'}</dt><dd>${(me?miles(me,s):miles(HOME,s)).toFixed(2)} mi</dd></div>
-      </dl>
-      <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
-        <button class="linkish js-setname">${reporter ? 'change' : 'add your name'}</button></p>
-    </details>
+    ${factsList(s)}
+    ${noteBlock(s.id)}
+    ${quietRow(s)}
   `;
 
   // the decision rides at the bottom of the screen, under your thumb
@@ -2408,7 +2394,9 @@ function renderTasks(){
          Worker.</div>`
     : '';
 
-  if (!todo.length && !done.length){
+  const seen = reviewed();
+
+  if (!todo.length && !done.length && !seen.length){
     el.innerHTML = offBar + undoBar + `<p class="msg"><b>No tasks yet</b>
       Report a site as “No tree” and a filing task shows up here,
       with the 311 wording already written for you.</p>`;
@@ -2489,13 +2477,44 @@ function renderTasks(){
     </details>`;
   };
 
+  /* A checked site that needs nothing from you is still a fact worth
+     keeping: what you found, the day you found it, and whatever you wrote
+     down while you were standing there. */
+  const seenRow = s => {
+    const m = marks[s.id] || {};
+    const st = stateOf(s);
+    return `<details class="donerow"${doneOpen.has(s.id) ? ' open' : ''} data-done="${esc(s.id)}">
+      <summary>
+        <span class="drmain">
+          <span class="draddr">${esc(s.address)}</span>
+          <span class="drmeta">${st === 'tree' ? 'Tree is there' : 'Already in the queue'}
+            · ${longDate(m.at)}${m.by ? ` · ${esc(m.by)}` : ''}</span>
+        </span>
+        <span class="drchev">›</span>
+      </summary>
+      <div class="drbody">
+        <p class="tm">Removal ${esc(s.id)} closed ${longDate(s.closed)}</p>
+        ${cityLine(s)}
+        ${noteBlock(s.id)}
+        <div class="btnrow">
+          <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+          <button class="mini ghost" data-mark="${esc(s.id)}::open">Check it again</button>
+        </div>
+      </div>
+    </details>`;
+  };
+
   el.innerHTML = offBar + undoBar +
     (todo.length
       ? `<p class="count">To do · ${todo.length} to file</p>` + todo.map(s => card(s,false)).join('')
       : `<p class="count">To do · nothing waiting</p>`) +
     (done.length
-      ? `<p class="count donehead">Done · ${done.length} filed</p>
+      ? `<p class="count donehead">Filed · ${done.length}</p>
          <div class="donelist">${done.map(doneRow).join('')}</div>`
+      : '') +
+    (seen.length
+      ? `<p class="count donehead">Reviewed · ${seen.length} checked, nothing to file</p>
+         <div class="donelist">${seen.map(seenRow).join('')}</div>`
       : '');
 }
 
@@ -2663,13 +2682,21 @@ document.addEventListener('click', async e => {
   if (nb){
     noting = nb.dataset.note;
     noteDraft = (marks[noting] && marks[noting].note) || '';
-    repaint();
-    const box = document.querySelector('.noteform .noteinput');
+    // the card is its own surface; repaint() alone would leave it stale
+    const inCard = !!nb.closest('#pitsheet');
+    if (inCard) renderSheet(); else repaint();
+    const box = document.querySelector(
+      (inCard ? '#pitsheet ' : '') + '.noteform .noteinput');
     if (box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
     return;
   }
   const nc = e.target.closest('[data-notecancel]');
-  if (nc){ noting = null; noteDraft = ''; repaint(); return; }
+  if (nc){
+    const inCard = !!nc.closest('#pitsheet');
+    noting = null; noteDraft = '';
+    if (inCard) renderSheet(); else repaint();
+    return;
+  }
 
   const mk = e.target.closest('[data-mark]');
   if (mk){
@@ -2788,9 +2815,11 @@ document.addEventListener('submit', async e => {
     marks[id] = { state: stateOf(byId(id)), ...(marks[id]||{}), at: new Date().toISOString() };
     if (text) marks[id].note = text; else delete marks[id].note;
     if (reporter) marks[id].by = reporter;
+    const inCard = !!nf.closest('#pitsheet');
     noting = null; noteDraft = '';
     await saveMarks();
     repaint();
+    if (inCard) renderSheet();
     return;
   }
 
