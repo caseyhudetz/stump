@@ -88,28 +88,25 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .topbar{flex:0 0 auto}
 
 /* ---------- browse controls ---------- */
-/* A pane scrolls its own content and keeps its controls pinned, so the
-   toggle and search sit under your thumb rather than at the far top. */
 .pane{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
-.controls{
-  flex:0 0 auto;order:2;
-  display:flex;gap:.4rem;align-items:stretch;
-  padding:.6rem 1.1rem calc(.6rem + env(safe-area-inset-bottom));
-  border-top:1px solid var(--line);background:var(--paper);
+.pane > .scroller{flex:1}
+.controls{display:flex;gap:.4rem;align-items:stretch;margin-top:.7rem}
+/* the sheet drops from the icon that opened it */
+.pane .panel{flex:0 0 auto;margin:.9rem 1.1rem 0;box-shadow:0 8px 20px rgba(0,0,0,.07)}
+
+/* one floating control switches the view, the way a map app does it */
+.viewpill{
+  position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(1.1rem + env(safe-area-inset-bottom));z-index:900;
+  display:inline-flex;align-items:center;gap:.55rem;
+  padding:.85rem 1.35rem;border:0;border-radius:2rem;cursor:pointer;
+  background:var(--ink);color:var(--paper);
+  font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 88,'wght' 700;
+  font-size:.92rem;letter-spacing:.01em;
+  box-shadow:0 4px 16px rgba(0,0,0,.28);
 }
-/* the sort sheet rises from the bar it belongs to */
-.pane > .scroller{order:0}
-.pane .panel{
-  order:1;flex:0 0 auto;margin:0 1.1rem .6rem;
-  box-shadow:0 -8px 20px rgba(0,0,0,.07);
-}
-.seg{display:flex;gap:0;border:1px solid var(--ink)}
-.seg button{
-  font-family:'IBM Plex Mono',monospace;font-size:.66rem;
-  text-transform:uppercase;letter-spacing:.09em;
-  padding:.5rem .9rem;border:0;background:transparent;color:var(--ink);cursor:pointer;
-}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.viewpill svg{width:1.1rem;height:1.1rem;flex:0 0 auto}
+.viewpill:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
 .search{
   flex:1;min-width:9rem;
   font-family:'IBM Plex Mono',monospace;font-size:.82rem;
@@ -154,7 +151,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .chev{color:var(--dim);flex:0 0 auto;font-size:1.1rem}
 
 /* ---------- map ---------- */
-#map{height:66vh;min-height:340px;width:100%;border:1px solid var(--line);background:var(--wash)}
+#map{height:72vh;min-height:380px;width:100%;border:1px solid var(--line);background:var(--wash)}
 .legend{
   display:flex;gap:1rem;flex-wrap:wrap;padding:.7rem 0 0;
   font-family:'IBM Plex Mono',monospace;font-size:.62rem;
@@ -162,10 +159,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 /* location is a quiet control on the map, not a banner above it */
 .locate{
-  position:absolute;right:.6rem;bottom:.6rem;z-index:1000;
-  width:2.6rem;height:2.6rem;padding:.55rem;
+  position:absolute;right:.75rem;bottom:.75rem;z-index:1000;
+  width:3.6rem;height:3.6rem;padding:.8rem;
   background:var(--paper);color:var(--ink);
-  border:1px solid var(--ink);cursor:pointer;border-radius:0;
+  border:2px solid var(--ink);cursor:pointer;border-radius:50%;
+  box-shadow:0 3px 12px rgba(0,0,0,.22);
 }
 .locate svg{width:100%;height:100%;display:block}
 .locate.on{background:#0E6FD8;border-color:#0E6FD8;color:#fff}
@@ -348,6 +346,20 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   padding:.85rem .9rem;margin-bottom:1rem;
   font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.7;color:var(--ink);
 }
+.srform{
+  margin-top:.8rem;border-top:1px solid var(--line);padding-top:.8rem;
+}
+.srrow{display:flex;gap:.5rem;margin-bottom:.5rem}
+.srinput{
+  flex:1;min-width:0;
+  font-family:'IBM Plex Mono',monospace;font-size:.85rem;
+  padding:.6rem .7rem;border:1px solid var(--ink);background:var(--paper);
+  color:var(--ink);border-radius:0;min-height:2.9rem;
+}
+.srinput:focus{outline:2px solid var(--hot);outline-offset:-2px}
+.srrow .mini{flex:0 0 auto;min-width:5rem}
+.srskip{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim)}
+.nosr{color:var(--dim);font-style:italic}
 .undobar{
   display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;
   background:var(--wash);border:1px solid var(--line);padding:.7rem .8rem;margin-bottom:1rem;
@@ -395,7 +407,16 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </button>
       </span>
     </div>
-    <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
+    <div class="controls">
+      <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
+      <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="dot" id="sortdot" hidden></span>
+      </button>
+    </div>
   </div>
 
   <main>
@@ -426,30 +447,22 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       </div>
       </div>
 
-      <div class="controls">
-        <div class="seg">
-          <button data-view="map" aria-pressed="true">Map</button>
-          <button data-view="list" aria-pressed="false">List</button>
-        </div>
-        <button class="iconbtn" id="sortbtn" aria-label="Sort and filter" aria-expanded="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span class="dot" id="sortdot" hidden></span>
-        </button>
-      </div>
+      <button class="viewpill" id="viewpill"></button>
 
       <div class="panel" id="sortpanel" hidden>
         <p class="plabel">Order by</p>
         <div class="prow">
           <button class="chip" data-sort="street" aria-pressed="true">Street A–Z</button>
-          <button class="chip" data-sort="near" aria-pressed="false">Nearest home</button>
+          <button class="chip" data-sort="near" aria-pressed="false">Closest</button>
           <button class="chip" data-sort="new" aria-pressed="false">Newest</button>
         </div>
         <p class="plabel">Show</p>
         <div class="prow">
-          <button class="chip" data-sort="todo" aria-pressed="false">Unchecked only</button>
+          <button class="chip" data-show="all" aria-pressed="true">All</button>
+          <button class="chip" data-show="open" aria-pressed="false">Unchecked</button>
+          <button class="chip" data-show="none" aria-pressed="false">No tree</button>
+          <button class="chip" data-show="req" aria-pressed="false">Filed</button>
+          <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
         </div>
       </div>
 
@@ -487,6 +500,10 @@ const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
+// Positron: near-monochrome, so the pins are the only saturated thing on screen
+const TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const TILE_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · ' +
+                    '&copy; <a href="https://carto.com/attributions">CARTO</a>';
 const FORM_311 = 'https://311.chicago.gov/s/new-service-request?typecodeid=a1Pt0000000Q7gBEAS&language=en_US';
 
 const REMOVALS_SINCE = (() => {
@@ -715,7 +732,7 @@ const packetText = s => Object.entries(packet(s)).map(([k,v]) => k+'\n'+v).join(
    STATE
    ============================================================ */
 let SITES = [];
-let tab = 'browse', view = 'map', sort = 'street', todoOnly = false;
+let tab = 'browse', view = 'map', sort = 'street', show = 'all';
 let mapView = null;   // {center, zoom} — your pan survives a re-render
 let query = '', detailId = null;
 let map = null, layer = null, mini = null;
@@ -798,6 +815,7 @@ const dist = mi => mi * 5280 < 1000
 function killMini(){
   if (mini){ try{ mini.remove(); }catch(e){} mini = null; }
 }
+let filing = null;      // task id whose request-number form is open
 let lastUndo = null;     // {id, address, prev} so an undo can be taken back
 let reporter = '';       // optional name, so shared reports say who checked
 let guest = false;       // arrived through someone else's share link
@@ -812,8 +830,10 @@ const doneTasks = () => SITES.filter(s => stateOf(s) === 'req')
 function filtered(){
   const q = query.trim().toLowerCase();
   let list = SITES.filter(s => !q || s.address.toLowerCase().includes(q));
-  if (todoOnly) list = list.filter(s => stateOf(s) === 'open');
-  if (sort === 'near')      list.sort((a,b) => miles(HOME,a) - miles(HOME,b));
+  if (show !== 'all') list = list.filter(s => stateOf(s) === show);
+  // "closest" means closest to you when we know where you are, home otherwise
+  const from = me || HOME;
+  if (sort === 'near')      list.sort((a,b) => miles(from,a) - miles(from,b));
   else if (sort === 'new')  list.sort((a,b) => b.closed.localeCompare(a.closed));
   else                      list.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
   return list;
@@ -829,13 +849,15 @@ function renderBrowse(){
   const list = filtered();
   // the only place a count appears, and it tracks whatever is on screen
   const unchecked = list.filter(s => stateOf(s) === 'open').length;
+  const LABEL = { open:'unchecked', none:'with no tree', req:'filed', tree:'with a tree' };
   $('#count').textContent = query
     ? `${list.length} match${list.length===1?'':'es'} for “${query}”`
-    : todoOnly
-      ? `${list.length} unchecked`
+    : show !== 'all'
+      ? `${list.length} ${LABEL[show]}`
       : `${list.length} sites · ${unchecked} unchecked`;
 
-  $('#sortdot').hidden = !(todoOnly || sort !== 'street');
+  $('#sortdot').hidden = !(show !== 'all' || sort !== 'street');
+  paintPill();
 
   $('#list').hidden = view !== 'list';
   $('#mapwrap').hidden = view !== 'map';
@@ -860,12 +882,23 @@ function renderBrowse(){
   }).join('');
 }
 
+const ICON_LIST = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const ICON_MAP = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M9 3 3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3zM9 3v15M15 6v15"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
+
+function paintPill(){
+  const el = $('#viewpill'); if (!el) return;
+  el.innerHTML = view === 'map' ? ICON_LIST + 'Show list' : ICON_MAP + 'Show map';
+  el.setAttribute('aria-label', view === 'map' ? 'Show list' : 'Show map');
+}
+
 function ensureMap(){
   if (map || typeof L === 'undefined') return;
   map = L.map('map', { attributionControl:true });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map);
+  L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(map);
   layer = L.layerGroup().addTo(map);
   const keep = () => {
     const c = map.getCenter();
@@ -922,11 +955,13 @@ function renderDetail(){
   const el = $('#detail');
   if (!s){ el.innerHTML = `<p class="msg">Site not found.</p>`; return; }
   const st = stateOf(s);
-  const when = marks[s.id] && marks[s.id].at;
+  const m = marks[s.id];
+  const when = m && m.at;
 
   const banner = st === 'none' ? `<div class="state none">
         Reported <b>no tree</b> ${when?ago(when):''} — a task is waiting for you under <b>Tasks</b>.</div>`
-    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}.</div>`
+    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}${
+        m && m.sr ? ` · <b>${esc(m.sr)}</b>` : ''}.</div>`
     : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
     : '';
 
@@ -973,11 +1008,15 @@ function renderDetail(){
     <details class="more"${detailsOpen ? ' open' : ''}>
       <summary>Details</summary>
       <dl class="facts">
-        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)}</dd></div>
-        <div class="fact"><dt>That was</dt><dd>${ago(s.closed)}</dd></div>
-        <div class="fact"><dt>City request</dt><dd>${esc(s.id)}</dd></div>
+        <div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
+        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>
+        ${st === 'req' ? `<div class="fact"><dt>Planting request</dt><dd>${
+          m && m.sr ? esc(m.sr) : '<span class="nosr">not recorded</span>'}</dd></div>
+        <div class="fact"><dt>Filed</dt><dd>${when ? longDate(when)+' · '+ago(when) : '—'}</dd></div>` : ''}
+        ${st === 'none' && when ? `<div class="fact"><dt>Gap confirmed</dt><dd>${longDate(when)}${
+          m && m.by ? ' · '+esc(m.by) : ''}</dd></div>` : ''}
         <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
-        <div class="fact"><dt>From home</dt><dd>${miles(HOME,s).toFixed(2)} mi</dd></div>
+        <div class="fact"><dt>From ${me ? 'you' : 'home'}</dt><dd>${(me?miles(me,s):miles(HOME,s)).toFixed(2)} mi</dd></div>
       </dl>
       <p class="who">Reporting as <b>${reporter ? esc(reporter) : 'anonymous'}</b> ·
         <button class="linkish js-setname">${reporter ? 'change' : 'add your name'}</button></p>
@@ -999,10 +1038,7 @@ function renderDetail(){
       // the card past the map would zoom it instead of moving the page.
       scrollWheelZoom: false
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(mini);
+    L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(mini);
     L.circleMarker([s.lat,s.lng], {
       radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1
     }).addTo(mini);
@@ -1036,6 +1072,22 @@ function renderDetail(){
 /* ============================================================
    TASKS
    ============================================================ */
+/* Capturing the 311 number is what turns a task into a record: the site
+   then carries both the city's removal request and your planting request. */
+function srForm(s){
+  const cur = (marks[s.id] && marks[s.id].sr) || '';
+  return `<form class="srform" data-srfor="${esc(s.id)}">
+    <label class="flabel" for="sr-${esc(s.id)}">311 request number from your confirmation</label>
+    <div class="srrow">
+      <input class="srinput" id="sr-${esc(s.id)}" name="sr" value="${esc(cur)}"
+             placeholder="e.g. SR26-01234567" autocomplete="off" enterkeyhint="done">
+      <button class="mini fill" type="submit">Save</button>
+    </div>
+    <button class="linkish srskip" type="button" data-skipsr="${esc(s.id)}">
+      ${cur ? 'Cancel' : "I don't have it yet"}</button>
+  </form>`;
+}
+
 function renderTasks(){
   const todo = tasks(), done = doneTasks();
   const el = $('#tasklist');
@@ -1075,9 +1127,15 @@ function renderTasks(){
       <h3>${esc(s.address)}</h3>
       <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''} ·
         removal ${s.id} closed ${longDate(s.closed)}</p>
-      ${isDone ? `<div class="btnrow">
+      ${isDone ? `
+        <p class="tm">${marks[s.id].sr
+          ? `Request <b>${esc(marks[s.id].sr)}</b>`
+          : `<span class="nosr">No request number recorded</span>`}</p>
+        <div class="btnrow">
+          <button class="mini ghost" data-file="${esc(s.id)}">${marks[s.id].sr ? 'Edit number' : 'Add number'}</button>
           <button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen</button>
-        </div>`
+        </div>
+        ${filing === s.id ? srForm(s) : ''}`
       : `<ol class="steps">
           <li>Open the 311 planting request form.</li>
           <li>Paste each field below.</li>
@@ -1089,9 +1147,10 @@ function renderTasks(){
         </div>
         <div class="packet"><h4>Paste this into the 311 request</h4>${fields}</div>
         <div class="btnrow">
-          <button class="mini fill" data-mark="${esc(s.id)}::req">Mark as filed</button>
+          <button class="mini fill" data-file="${esc(s.id)}">Mark as filed</button>
           <a class="mini ghost" href="tel:311">Call 311</a>
         </div>
+        ${filing === s.id ? srForm(s) : ''}
         <div class="btnrow">
           <button class="mini ghost" data-undo="${esc(s.id)}">Undo — remove this task</button>
         </div>`}
@@ -1164,11 +1223,8 @@ document.addEventListener('click', async e => {
 
   if (e.target.closest('#findme')){ findMe(); return; }
 
-  const vb = e.target.closest('.seg button[data-view]');
-  if (vb){
-    view = vb.dataset.view;
-    document.querySelectorAll('.seg button').forEach(b =>
-      b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  if (e.target.closest('#viewpill')){
+    view = view === 'map' ? 'list' : 'map';
     renderBrowse();
     if (view === 'map') paintMe();
     return;
@@ -1176,15 +1232,16 @@ document.addEventListener('click', async e => {
 
   const sc = e.target.closest('.chip[data-sort]');
   if (sc){
-    if (sc.dataset.sort === 'todo'){
-      todoOnly = !todoOnly;
-      sc.setAttribute('aria-pressed', String(todoOnly));
-    } else {
-      sort = sc.dataset.sort;
-      document.querySelectorAll('.chip[data-sort]').forEach(b => {
-        if (b.dataset.sort !== 'todo') b.setAttribute('aria-pressed', String(b.dataset.sort === sort));
-      });
-    }
+    sort = sc.dataset.sort;
+    document.querySelectorAll('.chip[data-sort]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.sort === sort)));
+    renderBrowse(); return;
+  }
+  const shc = e.target.closest('.chip[data-show]');
+  if (shc){
+    show = shc.dataset.show;
+    document.querySelectorAll('.chip[data-show]').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.show === show)));
     renderBrowse(); return;
   }
 
@@ -1207,6 +1264,24 @@ document.addEventListener('click', async e => {
     if (st === 'none' && detailId === id){ tab = 'tasks'; detailId = null; }
     repaint();
     return;
+  }
+
+  const fileBtn = e.target.closest('[data-file]');
+  if (fileBtn){ filing = fileBtn.dataset.file; renderTasks(); 
+    const inp = $('#sr-' + CSS.escape(filing)); if (inp) inp.focus();
+    return; }
+
+  const skip = e.target.closest('[data-skipsr]');
+  if (skip){
+    const id = skip.dataset.skipsr;
+    filing = null;
+    // "don't have it yet" still files the task; the number can come later
+    if (stateOf(byId(id)) !== 'req'){
+      marks[id] = { ...(marks[id]||{}), state:'req', at:new Date().toISOString() };
+      if (reporter) marks[id].by = reporter;
+      await saveMarks();
+    }
+    repaint(); return;
   }
 
   const un = e.target.closest('[data-undo]');
@@ -1256,6 +1331,20 @@ document.addEventListener('click', async e => {
 document.addEventListener('toggle', e => {
   if (e.target.classList && e.target.classList.contains('more')) detailsOpen = e.target.open;
 }, true);
+
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('.srform');
+  if (!form) return;
+  e.preventDefault();
+  const id = form.dataset.srfor;
+  const sr = (new FormData(form).get('sr') || '').toString().trim().slice(0,40);
+  marks[id] = { ...(marks[id]||{}), state:'req', at:new Date().toISOString() };
+  if (sr) marks[id].sr = sr; else delete marks[id].sr;
+  if (reporter) marks[id].by = reporter;
+  filing = null;
+  await saveMarks();
+  repaint();
+});
 
 let qt;
 document.addEventListener('input', e => {

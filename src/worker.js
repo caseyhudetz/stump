@@ -40,6 +40,8 @@ function stampedNow(at, now) {
 function clean(m, now) {
   const out = { state: m.state, at: stampedNow(m.at, now) };
   if (typeof m.by === 'string' && m.by.trim()) out.by = m.by.trim().slice(0, 40);
+  // the 311 number for the planting request, so the audit trail survives sync
+  if (typeof m.sr === 'string' && m.sr.trim()) out.sr = m.sr.trim().slice(0, 40);
   return out;
 }
 
