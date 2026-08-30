@@ -146,6 +146,34 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-family:'IBM Plex Mono',monospace;font-size:.62rem;
   text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
 }
+/* location sits above the map as an optional extra, never a gate */
+.mebar{
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  border:1px solid var(--line);background:var(--wash);
+  padding:.6rem .7rem;margin-bottom:.6rem;min-height:2.9rem;
+}
+.mebtn{
+  font-family:'Archivo',sans-serif;font-variation-settings:'wdth' 84,'wght' 700;
+  font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;
+  background:var(--ink);color:var(--paper);border:1px solid var(--ink);
+  padding:.45rem .75rem;cursor:pointer;border-radius:0;min-height:2.2rem;
+}
+.mebtn:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.mehint,.mefuzz{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
+  line-height:1.6;flex:1;min-width:8rem;
+}
+.mefuzz{flex:0 0 auto;color:var(--hot)}
+.medot{
+  width:.7rem;height:.7rem;border-radius:50%;background:#0E6FD8;
+  border:2px solid var(--paper);box-shadow:0 0 0 1px #0E6FD8;flex:0 0 auto;
+}
+.melink{
+  flex:1;text-align:left;background:none;border:0;padding:0;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ink);
+  text-decoration:underline;text-underline-offset:3px;
+}
+.melink b{font-weight:600}
 .legend span{display:inline-flex;align-items:center;gap:.35rem}
 .legend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
@@ -385,12 +413,14 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <p class="count" id="count"></p>
       <div id="list"></div>
       <div id="mapwrap" hidden>
+        <div id="mebar" class="mebar"></div>
         <div id="map"></div>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
           <span><i style="background:#E2330A"></i>No tree</span>
           <span><i style="background:#0B7A38"></i>Filed</span>
           <span><i style="background:#B8B6AE"></i>Has tree</span>
+          <span><i style="background:#0E6FD8"></i>You</span>
         </div>
       </div>
     </section>
@@ -661,6 +691,79 @@ let map = null, layer = null, mini = null;
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
 let miniView = null;       // {id, center, zoom} — keeps where you panned/zoomed to
 
+/* Location is an optional extra on the map, never something the app needs.
+   It is asked for only when you tap Find me, so a browser that refuses
+   costs nothing anywhere else. */
+let me = null, meAcc = null, meWatch = null;
+let meState = 'idle';      // idle | finding | on | blocked | unavailable | unsupported
+
+function findMe(){
+  if (!navigator.geolocation){ meState = 'unsupported'; paintMe(); return; }
+  if (meWatch !== null) navigator.geolocation.clearWatch(meWatch);
+  const asked = Date.now();
+  meState = 'finding'; paintMe();
+  meWatch = navigator.geolocation.watchPosition(
+    pos => {
+      me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      meAcc = pos.coords.accuracy;
+      meState = 'on';
+      paintMe();
+      if (tab === 'browse' && view === 'map') renderMap(filtered());
+    },
+    err => {
+      me = null;
+      meState = err.code === 1 ? 'blocked' : 'unavailable';
+      meFast = err.code === 1 && Date.now() - asked < 1000;
+      paintMe();
+    },
+    { enableHighAccuracy:true, maximumAge:10000, timeout:20000 }
+  );
+}
+let meFast = false;
+
+/* nearest site still needing a look */
+function nearestUnchecked(){
+  if (!me) return null;
+  const open = SITES.filter(s => stateOf(s) === 'open');
+  if (!open.length) return null;
+  return open.reduce((a,b) => miles(me,b) < miles(me,a) ? b : a);
+}
+
+function paintMe(){
+  const el = $('#mebar'); if (!el) return;
+  if (meState === 'on' && me){
+    const n = nearestUnchecked();
+    el.innerHTML = n
+      ? `<span class="medot"></span>
+         <button class="melink" data-open="${esc(n.id)}">
+           <b>${dist(miles(me,n))}</b> to ${esc(n.address)} →
+         </button>
+         ${meAcc && meAcc > 40 ? `<span class="mefuzz">±${Math.round(meAcc*3.28)} ft</span>` : ''}`
+      : `<span class="medot"></span>You're on the map · nothing left to check`;
+    return;
+  }
+  if (meState === 'finding'){ el.innerHTML = `<span class="spin">◍</span> Finding you…`; return; }
+  if (meState === 'idle'){
+    el.innerHTML = `<button class="mebtn" id="findme">Find me</button>
+      <span class="mehint">show where you are and what's nearest</span>`;
+    return;
+  }
+  const why = {
+    blocked: meFast
+      ? `Safari has a saved “Don’t Allow” for this site. Settings → Safari →
+         Advanced → Website Data → delete this site, then reload.`
+      : `Location permission was refused.`,
+    unavailable: `No position available — signal may be weak.`,
+    unsupported: `This browser has no location support.`
+  }[meState];
+  el.innerHTML = `<button class="mebtn" id="findme">Try again</button>
+    <span class="mehint">${why}</span>`;
+}
+
+const dist = mi => mi * 5280 < 1000
+  ? Math.round(mi * 5280) + ' ft'
+  : mi.toFixed(2) + ' mi';
+
 /* Leaflet has to let go of its container before innerHTML replaces it. */
 function killMini(){
   if (mini){ try{ mini.remove(); }catch(e){} mini = null; }
@@ -707,7 +810,7 @@ function renderBrowse(){
   $('#list').hidden = view !== 'list';
   $('#mapwrap').hidden = view !== 'map';
 
-  if (view === 'map'){ renderMap(list); return; }
+  if (view === 'map'){ renderMap(list); paintMe(); return; }
 
   if (!list.length){
     $('#list').innerHTML = `<p class="msg">Nothing matches.<br>Try a different search.</p>`;
@@ -755,6 +858,18 @@ function renderMap(list){
        <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`);
     pts.push([s.lat,s.lng]);
   });
+  // you, when location is working — an accuracy halo plus a solid dot
+  if (me){
+    if (meAcc && meAcc > 25){
+      L.circle([me.lat, me.lng], { radius: meAcc, weight:1,
+        color:'#0E6FD8', fillColor:'#0E6FD8', fillOpacity:.10 }).addTo(layer);
+    }
+    L.circleMarker([me.lat, me.lng], {
+      radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
+    }).addTo(layer).bindPopup('<b>You</b>');
+    pts.push([me.lat, me.lng]);
+  }
+
   if (pts.length > 1) map.fitBounds(pts, { padding:[30,30], maxZoom:17 });
   else if (pts.length) map.setView(pts[0], 17);
   else map.setView([HOME.lat,HOME.lng], 15);
@@ -998,12 +1113,16 @@ document.addEventListener('click', async e => {
   // a tap anywhere else closes the panel, except inside it
   if (!e.target.closest('#sortpanel')) closeSort();
 
+  if (e.target.closest('#findme')){ findMe(); return; }
+
   const vb = e.target.closest('.seg button[data-view]');
   if (vb){
     view = vb.dataset.view;
     document.querySelectorAll('.seg button').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.view === view)));
-    renderBrowse(); return;
+    renderBrowse();
+    if (view === 'map') paintMe();
+    return;
   }
 
   const sc = e.target.closest('.chip[data-sort]');
