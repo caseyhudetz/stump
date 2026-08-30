@@ -88,7 +88,21 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .topbar{flex:0 0 auto}
 
 /* ---------- browse controls ---------- */
-.controls{display:flex;gap:.4rem;align-items:stretch;margin-bottom:.6rem}
+/* A pane scrolls its own content and keeps its controls pinned, so the
+   toggle and search sit under your thumb rather than at the far top. */
+.pane{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+.controls{
+  flex:0 0 auto;order:2;
+  display:flex;gap:.4rem;align-items:stretch;
+  padding:.6rem 1.1rem calc(.6rem + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--paper);
+}
+/* the sort sheet rises from the bar it belongs to */
+.pane > .scroller{order:0}
+.pane .panel{
+  order:1;flex:0 0 auto;margin:0 1.1rem .6rem;
+  box-shadow:0 -8px 20px rgba(0,0,0,.07);
+}
 .seg{display:flex;gap:0;border:1px solid var(--ink)}
 .seg button{
   font-family:'IBM Plex Mono',monospace;font-size:.66rem;
@@ -380,7 +394,24 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   </div>
 
   <main>
-    <section id="browse" class="scroller">
+    <section id="browse" class="pane">
+      <div class="scroller">
+      <div id="guestnote"></div>
+      <p class="count" id="count"></p>
+      <div id="list"></div>
+      <div id="mapwrap" hidden>
+        <div id="mebar" class="mebar"></div>
+        <div id="map"></div>
+        <div class="legend">
+          <span><i style="background:#0B0B0C"></i>Unchecked</span>
+          <span><i style="background:#E2330A"></i>No tree</span>
+          <span><i style="background:#0B7A38"></i>Filed</span>
+          <span><i style="background:#B8B6AE"></i>Has tree</span>
+          <span><i style="background:#0E6FD8"></i>You</span>
+        </div>
+      </div>
+      </div>
+
       <div class="controls">
         <div class="seg">
           <button data-view="list" aria-pressed="true">List</button>
@@ -409,20 +440,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </div>
       </div>
 
-      <div id="guestnote"></div>
-      <p class="count" id="count"></p>
-      <div id="list"></div>
-      <div id="mapwrap" hidden>
-        <div id="mebar" class="mebar"></div>
-        <div id="map"></div>
-        <div class="legend">
-          <span><i style="background:#0B0B0C"></i>Unchecked</span>
-          <span><i style="background:#E2330A"></i>No tree</span>
-          <span><i style="background:#0B7A38"></i>Filed</span>
-          <span><i style="background:#B8B6AE"></i>Has tree</span>
-          <span><i style="background:#0E6FD8"></i>You</span>
-        </div>
-      </div>
     </section>
 
     <section id="detail" class="scroller" hidden></section>
