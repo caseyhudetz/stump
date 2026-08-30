@@ -132,6 +132,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pill.none{background:var(--hot);border-color:var(--hot);color:#fff}
 .pill.req{background:var(--ok);border-color:var(--ok);color:#fff}
 .pill.tree{background:var(--wash)}
+.pill.plant{background:#C87A16;border-color:#C87A16;color:#fff}
+/* a planting request is a fact to look at, not a site to decide about */
+.row.static{cursor:default}
 .chev{color:var(--dim);flex:0 0 auto;font-size:1.1rem}
 
 /* ---------- map ---------- */
@@ -187,9 +190,50 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .topbar .panel{margin-top:.8rem}
 .panel .search{width:100%;margin-bottom:.9rem}
 /* OSM's own tiles, desaturated so the pins are the only colour on screen */
-.leaflet-tile-pane{filter:grayscale(1) brightness(1.07) contrast(.86)}
-.legend span{display:inline-flex;align-items:center;gap:.35rem}
-.legend i{width:.6rem;height:.6rem;border-radius:50%;display:inline-block}
+/* OSM's tiles warmed toward the paper this app is printed on, rather than
+   flattened to grey. Parks keep a trace of green and water a trace of blue,
+   which is most of the difference between a map and a photocopy. */
+.leaflet-tile-pane{
+  filter:grayscale(.78) sepia(.16) saturate(1.15) brightness(1.04) contrast(1.06);
+}
+.legend span{display:inline-flex;align-items:center;gap:.4rem}
+/* the key uses the same pins as the map, at the same size */
+.legend .pin{width:.62rem;height:.62rem;border-width:1.5px;box-shadow:none}
+.legend .lplant{display:none}
+.legend.plants .lsite{display:none}
+.legend.plants .lplant{display:inline-flex}
+
+/* ---------- pins ---------- */
+.pinwrap{background:none;border:0}
+.pin{
+  display:block;width:1rem;height:1rem;border-radius:50%;
+  border:2px solid var(--paper);background:var(--ink);
+  box-shadow:0 1px 3px rgba(11,11,12,.45);
+  /* the marker div is the tap target, not the dot drawn inside it, so the
+     whole 20px square answers a thumb rather than just the visible circle */
+  pointer-events:none;
+}
+.pin.none{background:var(--hot)}
+.pin.req {background:var(--ok)}
+.pin.tree{background:#B8B6AE;width:.8rem;height:.8rem;margin:.1rem;opacity:.85}
+.pin.plant{background:#C87A16}
+.pin.me{background:#0E6FD8;box-shadow:0 0 0 3px rgba(14,111,216,.22),0 1px 3px rgba(11,11,12,.4)}
+.pin.big{width:1.25rem;height:1.25rem;margin:-.15rem;border-width:3px}
+/* the pit you are looking at, while its popup is open */
+.leaflet-popup-content .pm + .pm{margin-top:.1rem}
+
+/* ---------- Leaflet's own furniture, in this app's clothes ---------- */
+.leaflet-container{background:var(--wash);font-family:'IBM Plex Mono',monospace}
+.leaflet-control-zoom{border:0!important;box-shadow:none!important;margin:.55rem!important}
+.leaflet-control-zoom a{
+  width:2rem!important;height:2rem!important;line-height:1.9rem!important;
+  background:var(--paper)!important;color:var(--ink)!important;
+  border:1px solid var(--ink)!important;border-radius:0!important;
+  font-size:1.05rem!important;font-weight:500;
+}
+.leaflet-control-zoom a:first-child{border-bottom:0!important}
+.leaflet-control-zoom a:hover{background:var(--wash)!important}
+.leaflet-control-zoom a.leaflet-disabled{opacity:.35}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--paper);color:var(--ink);border-radius:0}
 .leaflet-popup-content{font-family:'Archivo',sans-serif;margin:.7rem .8rem;min-width:160px}
 .leaflet-popup-content b{display:block;font-variation-settings:'wdth' 78,'wght' 700;
@@ -312,6 +356,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .others{border-top:1px solid var(--line);margin-top:1.1rem;padding-top:.3rem}
 .others .olabel{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--dim);
   text-transform:uppercase;letter-spacing:.08em;margin:.6rem 0 .2rem}
+.sheet .acc{opacity:.75;text-transform:none;letter-spacing:.02em}
 .sclose{
   position:absolute;top:.6rem;right:.7rem;background:none;border:0;cursor:pointer;
   font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--dim);
@@ -337,7 +382,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 }
 .noterow{display:flex;align-items:center;gap:.9rem;margin-top:.5rem}
 .noterow .mini{flex:0 0 auto;min-width:6rem;min-height:2.4rem;font-size:.78rem}
-.leaflet-control-attribution{font-size:.55rem}
+.leaflet-control-attribution{
+  font-size:.5rem;background:rgba(250,249,246,.82)!important;
+  color:var(--dim);padding:.1rem .35rem;
+}
+.leaflet-control-attribution a{color:var(--dim)}
 .state{
   padding:.8rem .9rem;margin-bottom:1rem;
   font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
@@ -505,6 +554,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
           <button class="chip" data-show="none" aria-pressed="false">No tree</button>
           <button class="chip" data-show="req" aria-pressed="false">Filed</button>
           <button class="chip" data-show="tree" aria-pressed="false">Has tree</button>
+          <button class="chip" data-show="plant" aria-pressed="false">Planting requested</button>
         </div>
       </div>
   </div>
@@ -533,12 +583,14 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
             </svg>
           </button>
         </div>
-        <div class="legend">
-          <span><i style="background:#0B0B0C"></i>Unchecked</span>
-          <span><i style="background:#E2330A"></i>No tree</span>
-          <span><i style="background:#0B7A38"></i>Filed</span>
-          <span><i style="background:#B8B6AE"></i>Has tree</span>
-          <span><i style="background:#0E6FD8"></i>You</span>
+        <!-- .plants swaps the key over when the planting-request filter is on -->
+        <div class="legend" id="legend">
+          <span class="lsite"><i class="pin open"></i>Unchecked</span>
+          <span class="lsite"><i class="pin none"></i>No tree</span>
+          <span class="lsite"><i class="pin req"></i>Filed</span>
+          <span class="lsite"><i class="pin tree"></i>Has tree</span>
+          <span class="lplant"><i class="pin plant"></i>Requested, not planted</span>
+          <span><i class="pin me"></i>You</span>
         </div>
       </div>
       </div>
@@ -768,7 +820,7 @@ async function loadSites(){
     ),
     soda(
       `ward=${WARD} AND sr_type='Tree Planting Request' AND created_date > '2023-01-01T00:00:00'`,
-      'sr_number,street_number,street_direction,street_name,created_date,status'
+      'sr_number,street_number,street_direction,street_name,street_type,latitude,longitude,created_date,status'
     )
   ]);
 
@@ -801,7 +853,24 @@ async function loadSites(){
     }
     sites.push(site);
   }
-  return { sites, confirmed };
+
+  /* Trees the city has been asked for and has not planted yet. Not sites to
+     survey — there is nothing to decide at one — but the other half of the
+     picture: where the ward is already waiting on the Bureau of Forestry. */
+  const plants = plantings
+    .filter(p => p.latitude && p.longitude && !/^completed/i.test(p.status || ''))
+    .map(p => ({
+      id: p.sr_number,
+      address: p.street_number + ' ' +
+        titleCase([p.street_direction, p.street_name, p.street_type].filter(Boolean).join(' ')),
+      sortKey: (p.street_name||'').toUpperCase() + ' ' +
+        String(parseInt(p.street_number,10)||0).padStart(6,'0'),
+      lat: +p.latitude, lng: +p.longitude,
+      at: p.created_date, status: p.status || 'Open'
+    }))
+    .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+
+  return { sites, confirmed, plants };
 }
 
 /* One removal row from the city, in the shape the app uses. */
@@ -886,6 +955,7 @@ const packetText = s => Object.entries(packet(s)).map(([k,v]) => k+'\n'+v).join(
    STATE
    ============================================================ */
 let SITES = [];
+let PLANTS = [];   // open planting requests: a reference layer, not a worklist
 let tab = 'browse', view = 'map', sort = 'street', show = 'all';
 let query = '', detailId = null;
 let map = null, layer = null, mini = null, meLayer = null;
@@ -1038,28 +1108,59 @@ function filtered(){
 }
 
 const PILL = { open:['',''], none:['none','No tree'], req:['req','Filed'], tree:['tree','Has tree'] };
-const PIN  = { open:'#0B0B0C', none:'#E2330A', req:'#0B7A38', tree:'#B8B6AE' };
+
+/* Open planting requests, sorted and searched the same way. */
+function filteredPlants(){
+  const q = query.trim().toLowerCase();
+  const list = PLANTS.filter(p => !q || p.address.toLowerCase().includes(q));
+  const from = me || HOME;
+  if (sort === 'near')      list.sort((a,b) => miles(from,a) - miles(from,b));
+  else if (sort === 'new')  list.sort((a,b) => (b.at||'').localeCompare(a.at||''));
+  else                      list.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
+  return list;
+}
 
 /* ============================================================
    BROWSE
    ============================================================ */
 function renderBrowse(){
-  const list = filtered();
+  const plantView = show === 'plant';
+  const list = plantView ? filteredPlants() : filtered();
   // the only place a count appears, and it tracks whatever is on screen
-  const unchecked = list.filter(s => stateOf(s) === 'open').length;
+  const unchecked = plantView ? 0 : list.filter(s => stateOf(s) === 'open').length;
   const LABEL = { open:'unchecked', none:'with no tree', req:'filed', tree:'with a tree' };
   $('#count').textContent = query
     ? `${list.length} match${list.length===1?'':'es'} for “${query}”`
-    : show !== 'all'
-      ? `${list.length} ${LABEL[show]}`
-      : `${list.length} sites · ${unchecked} unchecked`;
+    : plantView
+      ? `${list.length} planting request${list.length===1?'':'s'} still open`
+      : show !== 'all'
+        ? `${list.length} ${LABEL[show]}`
+        : `${list.length} sites · ${unchecked} unchecked`;
 
   $('#sortdot').hidden = !(show !== 'all' || sort !== 'street' || view !== 'map');
+  $('#legend').classList.toggle('plants', plantView);
 
   $('#list').hidden = view !== 'list';
   $('#mapwrap').hidden = view !== 'map';
 
-  if (view === 'map'){ renderMap(list); paintMe(); return; }
+  if (view === 'map'){
+    renderMap(plantView ? plantSpecs(list) : siteSpecs(list));
+    paintMe();
+    return;
+  }
+
+  if (plantView){
+    $('#list').innerHTML = list.length
+      ? list.map(p => `<div class="row static">
+          <span class="rmain">
+            <span class="raddr">${esc(p.address)}</span>
+            <span class="rmeta">Requested ${ago(p.at)} · ${esc(p.id)}</span>
+          </span>
+          <span class="pill plant">Waiting</span>
+        </div>`).join('')
+      : `<p class="msg">No open planting requests in the ward.</p>`;
+    return;
+  }
 
   if (!list.length){
     $('#list').innerHTML = `<p class="msg">Nothing matches.<br>Try a different search.</p>`;
@@ -1099,12 +1200,40 @@ function renderMe(){
     L.circle([me.lat, me.lng], { radius: meAcc, weight:1,
       color:'#0E6FD8', fillColor:'#0E6FD8', fillOpacity:.10 }).addTo(meLayer);
   }
-  L.circleMarker([me.lat, me.lng], {
-    radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
-  }).addTo(meLayer).bindPopup('<b>You</b>');
+  L.marker([me.lat, me.lng], { icon: pinIcon('me') })
+    .addTo(meLayer).bindPopup('<b>You</b>');
 }
 
-function renderMap(list){
+/* A pin is a styled element rather than an SVG circle, so it can carry a
+   ring and a shadow and sit on the map instead of in it. */
+function pinIcon(kind){
+  return L.divIcon({
+    className: 'pinwrap',
+    html: `<i class="pin ${kind}"></i>`,
+    iconSize: [20,20], iconAnchor: [10,10], popupAnchor: [0,-9]
+  });
+}
+
+/* Every pin the map draws, from whatever it is drawing. */
+function siteSpecs(list){
+  return list.map(s => ({
+    id: s.id, lat: s.lat, lng: s.lng, kind: stateOf(s),
+    popup: `<b>${esc(s.address)}</b>
+            <span class="pm">Removal closed ${ago(s.closed)}</span>
+            <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`
+  }));
+}
+
+function plantSpecs(list){
+  return list.map(p => ({
+    id: 'plant:' + p.id, lat: p.lat, lng: p.lng, kind: 'plant',
+    popup: `<b>${esc(p.address)}</b>
+            <span class="pm">Tree requested ${ago(p.at)}</span>
+            <span class="pm">${esc(p.id)} · still open with the city</span>`
+  }));
+}
+
+function renderMap(specs){
   if (typeof L === 'undefined'){
     $('#map').innerHTML = `<p class="msg">Map didn't load.<br>Use the list instead.</p>`;
     return;
@@ -1114,27 +1243,21 @@ function renderMap(list){
   /* Pins are updated in place, never cleared and rebuilt. Clearing them took
      the popup you had just tapped with it, so a pin opened and vanished
      whenever a position fix or a sync pull landed a moment later. */
-  const want = new Set(list.map(s => s.id));
+  const want = new Set(specs.map(s => s.id));
   for (const id of Object.keys(pins)){
     if (!want.has(id)){ layer.removeLayer(pins[id]); delete pins[id]; }
   }
-  list.forEach(s => {
-    const st = stateOf(s);
-    let m = pins[s.id];
+  specs.forEach(spec => {
+    let m = pins[spec.id];
     if (!m){
-      m = L.circleMarker([s.lat,s.lng], {
-        radius:8, weight:2, color:'#fff', fillColor:PIN[st], fillOpacity:1
-      }).addTo(layer);
+      m = L.marker([spec.lat, spec.lng], { icon: pinIcon(spec.kind) }).addTo(layer);
       // bound once, so re-rendering never disturbs an open popup
-      m.bindPopup(
-        `<b>${esc(s.address)}</b>
-         <span class="pm">Removal closed ${ago(s.closed)}</span>
-         <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`);
-      m._st = st;
-      pins[s.id] = m;
+      m.bindPopup(spec.popup);
+      m._kind = spec.kind;
+      pins[spec.id] = m;
       return;
     }
-    if (m._st !== st){ m._st = st; m.setStyle({ fillColor: PIN[st] }); }
+    if (m._kind !== spec.kind){ m._kind = spec.kind; m.setIcon(pinIcon(spec.kind)); }
   });
 
   renderMe();
@@ -1255,8 +1378,7 @@ function closeShot(){
   if (el){ el.hidden = true; el.innerHTML = ''; }
 }
 
-/* The answer, in the order it is wanted: which pit is this, has a request
-   already gone in, and if not, the one tap that makes it a task. */
+/* The answer, once you have said which pit it is. */
 const VERDICT = {
   open: 'No planting request on record here. Nobody has asked for a tree yet.',
   none: 'Already reported as empty — a filing task is waiting for you.',
@@ -1264,46 +1386,61 @@ const VERDICT = {
   tree: 'This one was marked as still having a tree.'
 };
 
+/* What the location can and cannot settle.
+
+   A phone fix is good to roughly 5–20 m in the open and worse between tall
+   buildings; the tag written into a photo is the same fix. A Chicago street
+   is about 20 m kerb to kerb, so the pit across the road is comfortably
+   inside the error — reading the nearest record as *the* record turns a
+   fresh stump into "already reported". So: assert nothing unless one pit is
+   both close and clearly closer than the next, and otherwise ask. */
+const FT_PER_MI = 5280;
+const CONFIDENT_FT = 75;      // nearer than this, and it is plausibly the one
+const CANDIDATE_FT = 350;     // about a block: worth offering, never assuming
+
+function shotError(){
+  // metres of accuracy the browser reported, floored at a realistic best case
+  const m = shot && shot.from === 'you' && meAcc ? meAcc : 10;
+  return Math.max(m * 3.28084, 35);
+}
+
 function renderShot(){
   const el = $('#photosheet');
   if (!el || !shot) return;
+
+  const err = shotError();
   const near = SITES
-    .map(s => ({ s, mi: miles(shot.at, s) }))
-    .sort((a,b) => a.mi - b.mi)
-    .slice(0, 4);
-  const hit = near[0];
+    .map(s => ({ s, ft: miles(shot.at, s) * FT_PER_MI }))
+    .sort((a,b) => a.ft - b.ft);
+  const hit = near[0], next = near[1];
+  const inRange = near.filter(n => n.ft <= CANDIDATE_FT).slice(0, 6);
+
+  /* Sure means: close enough to be plausible, and the runner-up is farther
+     away than the measurement error. If two pits are separated by less than
+     the error, the fix cannot tell them apart, and the app should not
+     pretend otherwise — that is how a stump across the road from a past
+     filing gets read as that filing. */
+  const sure = hit && hit.ft <= Math.max(CONFIDENT_FT, err) &&
+    (!next || next.ft - hit.ft > err);
+
+  const chosen = shot.pick ? near.find(n => n.s.id === shot.pick) : null;
+  const pick = chosen || (sure ? hit : null);
 
   const body = !hit
     ? `<p class="msg">No removal records loaded yet.</p>`
-    : hit.mi > 0.114   /* 600 ft — past that, this is not the same pit */
+    : !inRange.length
     ? `<h3>Nothing on record here</h3>
        <p class="sdist">The nearest removal the city lists is
-         ${esc(hit.s.address)}, ${dist(hit.mi)} away. Stump made a record of the
-         removal, so a pit with no removal request behind it isn't one it can file for.</p>
-       ${others(near.slice(0,3))}`
-    : (() => {
-        const s = hit.s, st = stateOf(s), m = marks[s.id] || {};
-        const action = st === 'open'
-          ? `<div class="btnrow">
-               <button class="mini fill" data-mark="${esc(s.id)}::none">No tree — make a task</button>
-               <button class="mini ghost" data-mark="${esc(s.id)}::tree">Tree is here</button>
-             </div>`
-          : st === 'none'
-          ? `<div class="btnrow">
-               <button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>
-               <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
-             </div>`
-          : `<div class="btnrow">
-               <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
-             </div>`;
-        return `<h3>${esc(s.address)}</h3>
-          <p class="sdist">${dist(hit.mi)} from the photo · removal ${esc(s.id)}
-            closed ${ago(s.closed)}</p>
-          <div class="verdict ${st}">${VERDICT[st]}${
-            st === 'req' && m.sr ? ` <b>${esc(m.sr)}</b>` : ''}</div>
-          ${action}
-          ${others(near.slice(1,3))}`;
-      })();
+         ${esc(hit.s.address)}, ${dist(hit.ft / FT_PER_MI)} away. Stump works from
+         the city's removal records, so a pit with no removal behind it isn't one
+         it can file for.</p>`
+    : pick
+    ? verdictFor(pick, inRange.filter(n => n.s.id !== pick.s.id))
+    : `<h3>Which pit is this?</h3>
+       <p class="sdist">${inRange.length} within ${dist(CANDIDATE_FT / FT_PER_MI)}.
+         A phone fix can't tell one side of the street from the other, so pick
+         the address you are standing at.</p>
+       ${candidates(inRange)}`;
 
   el.innerHTML = `<div class="sheet">
     <button class="sclose" id="shotclose">Close</button>
@@ -1311,24 +1448,53 @@ function renderShot(){
       <img class="shot" src="${shot.url}" alt="">
       <p class="sfrom">${shot.from === 'photo'
         ? 'Located from the photo itself'
-        : 'The photo had no location — using where you are now'}</p>
+        : 'No location in the photo — using where you are now'}<br>
+        <span class="acc">accurate to about ${Math.round(err)} ft</span></p>
     </div>
     ${body}
   </div>`;
   el.hidden = false;
 }
 
-function others(list){
-  if (!list.length) return '';
-  return `<div class="others"><p class="olabel">Other pits nearby</p>
-    ${list.map(({s,mi}) => {
-      const [cls,label] = PILL[stateOf(s)];
-      return `<button class="row" data-open="${esc(s.id)}">
-        <span class="rmain"><span class="raddr">${esc(s.address)}</span>
-          <span class="rmeta">${dist(mi)} away</span></span>
-        ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
-        <span class="chev">›</span></button>`;
-    }).join('')}</div>`;
+function verdictFor(hit, rest){
+  const s = hit.s, st = stateOf(s), m = marks[s.id] || {};
+  const action = st === 'open'
+    ? `<div class="btnrow">
+         <button class="mini fill" data-mark="${esc(s.id)}::none">No tree — make a task</button>
+         <button class="mini ghost" data-mark="${esc(s.id)}::tree">Tree is here</button>
+       </div>`
+    : st === 'none'
+    ? `<div class="btnrow">
+         <button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>
+         <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+       </div>`
+    : `<div class="btnrow">
+         <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
+       </div>`;
+  return `<h3>${esc(s.address)}</h3>
+    <p class="sdist">${dist(hit.ft / FT_PER_MI)} from the photo · removal ${esc(s.id)}
+      closed ${ago(s.closed)}</p>
+    <div class="verdict ${st}">${VERDICT[st]}${
+      st === 'req' && m.sr ? ` <b>${esc(m.sr)}</b>` : ''}</div>
+    ${action}
+    ${rest.length ? `<div class="others">
+      <p class="olabel">Not this one? Also within ${dist(CANDIDATE_FT / FT_PER_MI)}</p>
+      ${rest.slice(0,5).map(rowFor).join('')}</div>` : ''}`;
+}
+
+/* Picking a candidate re-renders the sheet against that pit rather than
+   jumping away, so a wrong first guess costs one tap. */
+function candidates(list){
+  return `<div class="others">${list.map(rowFor).join('')}</div>`;
+}
+
+function rowFor({s, ft}){
+  const [cls,label] = PILL[stateOf(s)];
+  return `<button class="row" data-pick="${esc(s.id)}">
+    <span class="rmain"><span class="raddr">${esc(s.address)}</span>
+      <span class="rmeta">${dist(ft / FT_PER_MI)} away</span></span>
+    ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
+    <span class="chev">›</span></button>`;
 }
 
 /* ============================================================
@@ -1462,13 +1628,10 @@ function renderDetail(){
       scrollWheelZoom: false
     });
     L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(mini);
-    L.circleMarker([s.lat,s.lng], {
-      radius:9, weight:3, color:'#fff', fillColor:PIN[st], fillOpacity:1
-    }).addTo(mini);
+    L.marker([s.lat,s.lng], { icon: pinIcon(st + ' big') }).addTo(mini);
     if (me){
-      L.circleMarker([me.lat, me.lng], {
-        radius:7, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
-      }).addTo(mini).bindPopup('<b>You</b>');
+      L.marker([me.lat, me.lng], { icon: pinIcon('me') })
+        .addTo(mini).bindPopup('<b>You</b>');
     }
 
     mini.on('click',      () => mini.scrollWheelZoom.enable());
@@ -1646,6 +1809,10 @@ document.addEventListener('click', async e => {
   // the backdrop counts as a dismissal; the sheet itself does not
   if (e.target.closest('#shotclose') ||
       (e.target.id === 'photosheet' && shot)){ closeShot(); return; }
+
+  // naming the pit in the sheet answers it there, rather than leaving
+  const pk = e.target.closest('[data-pick]');
+  if (pk && shot){ shot.pick = pk.dataset.pick; renderShot(); return; }
 
   if (e.target.closest('#sortbtn')){
     const panel = $('#sortpanel');
@@ -1905,8 +2072,9 @@ function fallbackCopy(text, done){
   watchForRemoteEdits();
 
   try{
-    const { sites, confirmed } = await loadSites();
+    const { sites, confirmed, plants } = await loadSites();
     SITES = withReported(sites, confirmed);
+    PLANTS = plants;
 
     // Anything still missing was reported before snapshots existed. Ask the
     // city about those request numbers by name; this runs once, because the
