@@ -42,6 +42,9 @@ function clean(m, now) {
   if (typeof m.by === 'string' && m.by.trim()) out.by = m.by.trim().slice(0, 40);
   // the 311 number for the planting request, so the audit trail survives sync
   if (typeof m.sr === 'string' && m.sr.trim()) out.sr = m.sr.trim().slice(0, 40);
+  // what the person standing at the pit saw — several pits at one address,
+  // a stump left in the ground — which nothing else in the record can say
+  if (typeof m.note === 'string' && m.note.trim()) out.note = m.note.trim().slice(0, 200);
   return out;
 }
 

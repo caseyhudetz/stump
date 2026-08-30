@@ -271,6 +271,35 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   padding:.4rem .55rem;cursor:pointer;border-radius:0;
 }
 .recenter:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+/* the map's own recenter: icon only, thumb-sized, for use while moving */
+.aimbtn{
+  width:2.9rem;height:2.9rem;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.18);
+}
+.aimbtn svg{width:1.4rem;height:1.4rem}
+.aimbtn.on{color:#0E6FD8;border-color:#0E6FD8}
+.aimbtn.busy{opacity:.55;animation:pulse 1.2s ease-in-out infinite}
+
+/* a note about what is actually on the ground — several pits, a stump left
+   in place — kept next to the report it belongs to */
+.notebtn{
+  display:flex;align-items:flex-start;gap:.45rem;width:100%;text-align:left;
+  background:none;border:0;border-left:3px solid var(--line);
+  padding:.15rem 0 .15rem .55rem;margin:0 0 1rem;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;font-size:.68rem;line-height:1.6;color:var(--ink);
+}
+.notebtn svg{width:.95rem;height:.95rem;flex:0 0 auto;margin-top:.15rem;color:var(--dim)}
+.notebtn.empty{color:var(--dim);text-transform:uppercase;letter-spacing:.07em;font-size:.64rem}
+.notebtn:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+.noteform{margin:0 0 1rem}
+.noteinput{
+  width:100%;font:inherit;font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  line-height:1.6;padding:.6rem;border:1px solid var(--ink);border-radius:0;
+  background:var(--paper);color:var(--ink);resize:vertical;
+}
+.noterow{display:flex;align-items:center;gap:.9rem;margin-top:.5rem}
+.noterow .mini{flex:0 0 auto;min-width:6rem;min-height:2.4rem;font-size:.78rem}
 .leaflet-control-attribution{font-size:.55rem}
 .state{
   padding:.8rem .9rem;margin-bottom:1rem;
@@ -448,7 +477,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       </div>
       <div id="list"></div>
       <div id="mapwrap" hidden>
-        <div id="map"></div>
+        <div class="mapbox">
+          <div id="map"></div>
+          <!-- one thumb-sized control: find you the first time, put you back
+               in the middle every time after, for checking sites on the move -->
+          <button class="recenter aimbtn" id="mecenter" aria-label="Center the map on my location"></button>
+        </div>
         <div class="legend">
           <span><i style="background:#0B0B0C"></i>Unchecked</span>
           <span><i style="background:#E2330A"></i>No tree</span>
@@ -458,9 +492,6 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </div>
       </div>
       </div>
-
-
-
     </section>
 
     <section id="detail" class="scroller" hidden></section>
@@ -492,6 +523,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
    CONFIG
    ============================================================ */
 const HOME = { lat: 41.94526, lng: -87.64688, label: '659 W Cornelia' };
+/* The map opens on the neighbourhood, not on one house: roughly Diversey to
+   Irving Park, the lake to Ashland. Framing home put half the ward off screen. */
+const EAST_LAKEVIEW = [[41.9325, -87.6585], [41.9590, -87.6360]];
 const WARD = 44;
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const LOOKBACK_MONTHS = 6;
@@ -710,6 +744,7 @@ async function loadSites(){
    ============================================================ */
 function packet(s){
   const when = marks[s.id] && marks[s.id].at ? marks[s.id].at : new Date().toISOString();
+  const note = (marks[s.id] && marks[s.id].note) || '';
   return {
     'Request type': 'Tree Planting Request',
     'Address': `${s.address}, Chicago, IL ${s.zip}`,
@@ -717,7 +752,9 @@ function packet(s){
       `On the public parkway in front of ${s.address}. The parkway tree at this ` +
       `location was removed by the city and the tree pit is now empty. ` +
       `Prior removal service request ${s.id}, closed ${longDate(s.closed)}. ` +
-      `Site verified empty in person on ${longDate(when)}.`,
+      `Site verified empty in person on ${longDate(when)}.` +
+      // whatever the person standing there saw, in their own words
+      (note ? ` Noted on site: ${note}` : ''),
     'How many trees are you requesting?': '1',
     'Has a tree been planted recently?': 'No'
   };
@@ -729,9 +766,12 @@ const packetText = s => Object.entries(packet(s)).map(([k,v]) => k+'\n'+v).join(
    ============================================================ */
 let SITES = [];
 let tab = 'browse', view = 'map', sort = 'street', show = 'all';
-let mapView = null;   // {center, zoom} — your pan survives a re-render
 let query = '', detailId = null;
-let map = null, layer = null, mini = null;
+let map = null, layer = null, mini = null, meLayer = null;
+let pins = {};            // site id -> marker, reused between renders
+let mapFramed = false;    // the opening view is set once, then the map is yours
+let noting = null;        // site id whose note is being written
+let noteDraft = '';       // what is in the box, so a sync pull can't wipe it
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
 let miniView = null;       // {id, center, zoom} — keeps where you panned/zoomed to
 
@@ -740,6 +780,15 @@ let miniView = null;       // {id, center, zoom} — keeps where you panned/zoom
    costs nothing anywhere else. */
 let me = null, meAcc = null, meWatch = null;
 let meState = 'idle';      // idle | finding | on | blocked | unavailable | unsupported
+let centerWhenFound = false;   // set when Recenter had to ask for a fix first
+
+/* Put the map back on you, at a zoom close enough to tell one pit from
+   the next. Called by the map's own control, never automatically — being
+   yanked around mid-inspection was the old walking queue's worst habit. */
+function centerOnMe(){
+  if (!me || !map) return;
+  map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17));
+}
 
 function findMe(){
   if (!navigator.geolocation){ meState = 'unsupported'; paintMe(); toast('This browser has no location support.'); return; }
@@ -753,10 +802,14 @@ function findMe(){
       meState = 'on';
       Store.set('stump.geo', '1');   // granted once: locate silently from now on
       paintMe();
-      if (tab === 'browse' && view === 'map') renderMap(filtered());
+      // Only your own dot is redrawn. Rebuilding every pin on each fix is
+      // what used to close a popup a second after you tapped it.
+      renderMe();
+      if (centerWhenFound){ centerWhenFound = false; centerOnMe(); }
     },
     err => {
       me = null;
+      centerWhenFound = false;
       meState = err.code === 1 ? 'blocked' : 'unavailable';
       meFast = err.code === 1 && Date.now() - asked < 1000;
       paintMe();
@@ -787,6 +840,14 @@ const AIM = `<svg viewBox="0 0 24 24" aria-hidden="true">
    never costs a line of its own. Granted, it reports how far the nearest
    site is; anything gone wrong is a toast, not permanent furniture. */
 function paintMe(){
+  // the map's recenter control carries the same state, in colour only
+  const btn = $('#mecenter');
+  if (btn){
+    btn.className = 'recenter aimbtn' +
+      (meState === 'on' && me ? ' on' : meState === 'finding' ? ' busy' : '');
+    btn.innerHTML = AIM;
+  }
+
   const el = $('#mebar'); if (!el) return;
 
   if (meState === 'on' && me){
@@ -902,12 +963,24 @@ function ensureMap(){
   map = L.map('map', { attributionControl:true });
   L.tileLayer(TILES, { maxZoom:19, attribution:TILE_CREDIT }).addTo(map);
   layer = L.layerGroup().addTo(map);
-  const keep = () => {
-    const c = map.getCenter();
-    mapView = { center:[c.lat, c.lng], zoom: map.getZoom() };
-  };
-  map.on('moveend', keep);
-  map.on('zoomend', keep);
+  // your own dot lives in its own layer: a position fix can then be drawn
+  // without touching the site pins, popup and all
+  meLayer = L.layerGroup().addTo(map);
+  map.fitBounds(EAST_LAKEVIEW, { padding:[12,12] });
+}
+
+/* You, when location is working — an accuracy halo plus a solid dot. */
+function renderMe(){
+  if (!meLayer) return;
+  meLayer.clearLayers();
+  if (!me) return;
+  if (meAcc && meAcc > 25){
+    L.circle([me.lat, me.lng], { radius: meAcc, weight:1,
+      color:'#0E6FD8', fillColor:'#0E6FD8', fillOpacity:.10 }).addTo(meLayer);
+  }
+  L.circleMarker([me.lat, me.lng], {
+    radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
+  }).addTo(meLayer).bindPopup('<b>You</b>');
 }
 
 function renderMap(list){
@@ -916,37 +989,72 @@ function renderMap(list){
     return;
   }
   ensureMap(); if (!map) return;
-  layer.clearLayers();
-  const pts = [];
+
+  /* Pins are updated in place, never cleared and rebuilt. Clearing them took
+     the popup you had just tapped with it, so a pin opened and vanished
+     whenever a position fix or a sync pull landed a moment later. */
+  const want = new Set(list.map(s => s.id));
+  for (const id of Object.keys(pins)){
+    if (!want.has(id)){ layer.removeLayer(pins[id]); delete pins[id]; }
+  }
   list.forEach(s => {
     const st = stateOf(s);
-    const m = L.circleMarker([s.lat,s.lng], {
-      radius:8, weight:2, color:'#fff', fillColor:PIN[st], fillOpacity:1
-    }).addTo(layer);
-    m.bindPopup(
-      `<b>${esc(s.address)}</b>
-       <span class="pm">Removal closed ${ago(s.closed)}</span>
-       <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`);
-    pts.push([s.lat,s.lng]);
-  });
-  // you, when location is working — an accuracy halo plus a solid dot
-  if (me){
-    if (meAcc && meAcc > 25){
-      L.circle([me.lat, me.lng], { radius: meAcc, weight:1,
-        color:'#0E6FD8', fillColor:'#0E6FD8', fillOpacity:.10 }).addTo(layer);
+    let m = pins[s.id];
+    if (!m){
+      m = L.circleMarker([s.lat,s.lng], {
+        radius:8, weight:2, color:'#fff', fillColor:PIN[st], fillOpacity:1
+      }).addTo(layer);
+      // bound once, so re-rendering never disturbs an open popup
+      m.bindPopup(
+        `<b>${esc(s.address)}</b>
+         <span class="pm">Removal closed ${ago(s.closed)}</span>
+         <button class="popbtn" data-open="${esc(s.id)}">Open this site</button>`);
+      m._st = st;
+      pins[s.id] = m;
+      return;
     }
-    L.circleMarker([me.lat, me.lng], {
-      radius:8, weight:3, color:'#fff', fillColor:'#0E6FD8', fillOpacity:1
-    }).addTo(layer).bindPopup('<b>You</b>');
-    pts.push([me.lat, me.lng]);
-  }
+    if (m._st !== st){ m._st = st; m.setStyle({ fillColor: PIN[st] }); }
+  });
 
-  // Open on East Lakeview rather than fitting every pin, which zoomed out far
-  // enough to be useless. After that the view is yours — re-rendering on a
-  // sync pull must not yank you back.
-  if (mapView) map.setView(mapView.center, mapView.zoom);
-  else map.setView([HOME.lat, HOME.lng], 15);
-  requestAnimationFrame(() => map.invalidateSize());
+  renderMe();
+
+  // The opening view is the whole neighbourhood; after that the map is
+  // yours, and no later render moves it.
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    if (!mapFramed && map.getSize().y > 50){
+      mapFramed = true;
+      map.fitBounds(EAST_LAKEVIEW, { padding:[12,12] });
+    }
+  });
+}
+
+/* ============================================================
+   NOTES
+   ============================================================ */
+/* What the address alone can't say: several empty pits at one number, a
+   stump still in the ground, the pit paved over. The note travels with the
+   report and goes into the 311 wording, so it reaches the city too. */
+const NOTE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M5 4h14v13l-4 4H5z" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linejoin="round"/>
+  <path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+function noteBlock(id){
+  const saved = (marks[id] && marks[id].note) || '';
+  if (noting === id){
+    return `<form class="noteform" data-notefor="${esc(id)}">
+      <textarea class="noteinput" name="note" rows="3" maxlength="200"
+        placeholder="e.g. three empty pits at this address, not one"
+        >${esc(noteDraft)}</textarea>
+      <div class="noterow">
+        <button class="mini fill" type="submit">Save note</button>
+        <button class="linkish" type="button" data-notecancel="${esc(id)}">Cancel</button>
+      </div>
+    </form>`;
+  }
+  return `<button class="notebtn${saved ? '' : ' empty'}" data-note="${esc(id)}">
+    ${NOTE_ICON}<span>${saved ? esc(saved) : 'Add a note'}</span></button>`;
 }
 
 /* ============================================================
@@ -1002,6 +1110,7 @@ function renderDetail(){
     </div>
 
     ${banner}
+    ${noteBlock(s.id)}
     <div class="mapbox">
       <div id="minimap"></div>
       <button class="recenter" id="recenter">Recenter</button>
@@ -1129,6 +1238,7 @@ function renderTasks(){
       <h3>${esc(s.address)}</h3>
       <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''} ·
         removal ${s.id} closed ${longDate(s.closed)}</p>
+      ${noteBlock(s.id)}
       ${isDone ? `
         <p class="tm">${marks[s.id].sr
           ? `Request <b>${esc(marks[s.id].sr)}</b>`
@@ -1207,6 +1317,14 @@ document.addEventListener('click', async e => {
     return;
   }
 
+  // Recenter on the main map. If we have never had a fix, ask for one and
+  // centre as soon as it arrives, so it is still a single tap.
+  if (e.target.closest('#mecenter')){
+    if (me) centerOnMe();
+    else { centerWhenFound = true; findMe(); }
+    return;
+  }
+
   if (e.target.closest('#sortbtn')){
     const panel = $('#sortpanel');
     const openNow = panel.hidden;
@@ -1257,10 +1375,27 @@ document.addEventListener('click', async e => {
   const goto = e.target.closest('[data-goto-task]');
   if (goto){ tab = 'tasks'; detailId = null; repaint(); return; }
 
+  const nb = e.target.closest('[data-note]');
+  if (nb){
+    noting = nb.dataset.note;
+    noteDraft = (marks[noting] && marks[noting].note) || '';
+    repaint();
+    const box = document.querySelector('.noteform .noteinput');
+    if (box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
+  const nc = e.target.closest('[data-notecancel]');
+  if (nc){ noting = null; noteDraft = ''; repaint(); return; }
+
   const mk = e.target.closest('[data-mark]');
   if (mk){
     const [id, st] = mk.dataset.mark.split('::');
+    const prev = marks[id] || {};
     marks[id] = { state: st, at: new Date().toISOString() };
+    // a note describes the site, not the answer, so it outlives a re-report
+    if (prev.note) marks[id].note = prev.note;
+    // the 311 number belongs to a filing; undoing or finding a tree ends it
+    if (prev.sr && (st === 'req' || st === 'none')) marks[id].sr = prev.sr;
     if (reporter) marks[id].by = reporter;
     lastUndo = null;
     await saveMarks();
@@ -1292,7 +1427,9 @@ document.addEventListener('click', async e => {
   if (un){
     const id = un.dataset.undo, s = byId(id);
     lastUndo = { id, address: s ? s.address : id, prev: marks[id] };
+    const note = marks[id] && marks[id].note;
     marks[id] = { state:'open', at:new Date().toISOString() };
+    if (note) marks[id].note = note;   // what you saw there is still true
     if (reporter) marks[id].by = reporter;
     await saveMarks();
     repaint();
@@ -1337,6 +1474,21 @@ document.addEventListener('toggle', e => {
 }, true);
 
 document.addEventListener('submit', async e => {
+  const nf = e.target.closest('.noteform');
+  if (nf){
+    e.preventDefault();
+    const id = nf.dataset.notefor;
+    const text = (new FormData(nf).get('note') || '').toString().trim().slice(0,200);
+    // keep the state and the request number this site already carries
+    marks[id] = { state: stateOf(byId(id)), ...(marks[id]||{}), at: new Date().toISOString() };
+    if (text) marks[id].note = text; else delete marks[id].note;
+    if (reporter) marks[id].by = reporter;
+    noting = null; noteDraft = '';
+    await saveMarks();
+    repaint();
+    return;
+  }
+
   const form = e.target.closest('.srform');
   if (!form) return;
   e.preventDefault();
@@ -1352,6 +1504,10 @@ document.addEventListener('submit', async e => {
 
 let qt;
 document.addEventListener('input', e => {
+  // hold what is typed, so a sync pull re-rendering the card can't wipe it
+  if (e.target.classList && e.target.classList.contains('noteinput')){
+    noteDraft = e.target.value; return;
+  }
   if (e.target.id !== 'q') return;
   clearTimeout(qt);
   qt = setTimeout(() => { query = e.target.value; renderBrowse(); }, 150);
