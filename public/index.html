@@ -560,6 +560,16 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .spotform{margin-top:1rem}
 .spotform .srinput{width:100%;margin:.35rem 0 0}
 .spotform .btnrow{margin-top:.7rem}
+/* the photo that made the task, beside what it is for */
+.shotline{display:flex;gap:.75rem;align-items:center;margin:.7rem 0;
+  padding:.55rem;background:var(--wash);border:1px solid var(--line)}
+.shotline .tshot{width:3.4rem;height:3.4rem;object-fit:cover;flex:0 0 auto;
+  border:1px solid var(--line);border-radius:.3rem;background:var(--line)}
+.shotline .shotsay{min-width:0}
+.shotline .shotsay p{font-family:'IBM Plex Mono',monospace;font-size:.66rem;
+  line-height:1.5;color:var(--dim);margin:0}
+.shotline .shotopen{font-size:.66rem;margin-top:.15rem;display:inline-block}
+.addrnote{margin-top:-.15rem}
 .verdict{
   padding:.75rem .85rem;margin:.9rem 0;
   font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
@@ -1022,6 +1032,7 @@ function watchForRemoteEdits(){
    HELPERS
    ============================================================ */
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const rad = x => x * Math.PI / 180;
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1463,6 +1474,7 @@ function killMini(){
   if (mini){ try{ mini.remove(); }catch(e){} mini = null; }
 }
 let filing = null;      // task id whose request-number form is open
+let fixingAddr = null;  // spot task whose looked-up address is being corrected
 let lastUndo = null;     // {id, address, prev} so an undo can be taken back
 let reporter = '';       // optional name, so shared reports say who checked
 let guest = false;       // arrived through someone else's share link
@@ -2118,19 +2130,146 @@ function tiffGPS(v, base){
   return out;
 }
 
-let shot = null;      // { url, at:{lat,lng}, from:'photo'|'you' }
+/* ---------- the photo, kept where it is useful ----------
+
+   The marks live in one KV value that every device downloads whole on every
+   sync; a photo in there would be paid for on every load, by every device,
+   forever. And it would buy nothing at the 311 form: a page cannot put a
+   file into another site's file picker, so the attachment is always chosen
+   by hand. What is actually missing when you sit down to file is knowing
+   *which* of forty pictures belongs to this task — and that is answered by
+   keeping the picture on the phone that took it. IndexedDB holds blobs,
+   costs nothing, and needs no binding. It does not travel between devices;
+   the report does. */
+const PHOTO_STORE = 'shots';
+let photoDb = null;
+
+function photos(){
+  if (photoDb) return photoDb;
+  photoDb = new Promise(res => {
+    let req;
+    try{ req = indexedDB.open('stump.photos', 1); }catch(e){ return res(null); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => res(null);
+  });
+  return photoDb;
+}
+
+/* Every call is best-effort: private mode, a full disk or a browser with the
+   store switched off must cost the task nothing. */
+async function photoOp(mode, run){
+  try{
+    const db = await photos();
+    if (!db) return null;
+    return await new Promise(res => {
+      const tx = db.transaction(PHOTO_STORE, mode);
+      const out = run(tx.objectStore(PHOTO_STORE));
+      tx.oncomplete = () => res(out && 'result' in out ? out.result : true);
+      tx.onerror = tx.onabort = () => res(null);
+    });
+  }catch(e){ return null; }
+}
+
+const getPhoto = id => photoOp('readonly',  st => st.get(id));
+const delPhoto = id => photoOp('readwrite', st => st.delete(id));
+
+async function putPhoto(id, file){
+  if (!file) return;
+  // Ask the browser to treat this as worth keeping. Safari clears ordinary
+  // site data after about a week of not visiting; granted or not, the task
+  // itself is safe — it syncs — so a lost picture is a lost picture only.
+  try{ if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  await photoOp('readwrite', st => st.put(file, id));
+  photoSrc.delete(id);
+}
+
+/* Object URLs are minted once per id and reused, so a repaint does not leak
+   one per render. */
+const photoSrc = new Map();
+async function paintPhotos(){
+  for (const el of $$('[data-shot]')){
+    const id = el.dataset.shot;
+    if (el.dataset.painted === id) continue;
+    let url = photoSrc.get(id);
+    if (url === undefined){
+      const blob = await getPhoto(id);
+      url = blob ? URL.createObjectURL(blob) : null;
+      photoSrc.set(id, url);
+    }
+    if (!url){ const box = el.closest('.shotline'); if (box) box.hidden = true; continue; }
+    el.src = url;
+    el.dataset.painted = id;
+    const box = el.closest('.shotline');
+    if (box){ box.hidden = false; const a = box.querySelector('a.shotopen'); if (a) a.href = url; }
+  }
+}
+
+function forgetPhoto(id){
+  const url = photoSrc.get(id);
+  if (url) URL.revokeObjectURL(url);
+  photoSrc.delete(id);
+  delPhoto(id);
+}
+
+/* ---------- what the coordinates are called ----------
+
+   311 wants a street address, and a phone knows only where it is. The
+   OpenStreetMap geocoder turns one into the other, keyless; it spells names
+   out ("West Cornelia Avenue") where Chicago writes them short, so shorten
+   them back. A lookup that fails, times out or lands on a point with no
+   house number leaves you typing it, which is exactly the old path. */
+const ADDR_WORD = {
+  north:'N', south:'S', east:'E', west:'W',
+  northwest:'NW', northeast:'NE', southwest:'SW', southeast:'SE',
+  avenue:'Ave', street:'St', boulevard:'Blvd', place:'Pl', drive:'Dr',
+  court:'Ct', lane:'Ln', road:'Rd', terrace:'Ter', parkway:'Pkwy',
+  square:'Sq', highway:'Hwy', trail:'Trl', circle:'Cir'
+};
+
+function shortStreet(road){
+  return String(road || '').split(/\s+/).filter(Boolean)
+    .map(w => ADDR_WORD[w.toLowerCase()] || w).join(' ');
+}
+
+async function reverseAddress(at){
+  const ctl = new AbortController();
+  const bail = setTimeout(() => ctl.abort(), 7000);
+  try{
+    const u = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2' +
+      '&zoom=18&addressdetails=1&lat=' + encodeURIComponent(at.lat) +
+      '&lon=' + encodeURIComponent(at.lng);
+    const r = await fetch(u, { signal: ctl.signal, headers:{ accept:'application/json' } });
+    if (!r.ok) return null;
+    const a = (await r.json()).address || {};
+    if (!a.house_number || !a.road) return null;   // no number, no 311 request
+    return { address: `${a.house_number} ${shortStreet(a.road)}`.slice(0, 80),
+             zip: /^\d{5}$/.test(a.postcode || '') ? a.postcode : '' };
+  }catch(e){ return null; }
+  finally{ clearTimeout(bail); }
+}
+
+let shot = null;      // { url, file, at:{lat,lng}, from:'photo'|'you' }
 let spotting = false; // typing the address for a pit the city never recorded
+let locating = false; // the address lookup is out
 
 /* A stump the removal records never caught is still a stump. The app finds
    candidates from those records, so it has no address for this one — but a
-   planting request does not need a removal behind it, only a place. You
-   supply the address; everything else comes from where you are standing. */
+   planting request does not need a removal behind it, only a place. One tap
+   is the whole thing: the coordinates are already in hand, and the address
+   is looked up from them. Typing is the fallback, not the route. */
 function spotForm(){
+  if (locating) return `<div class="btnrow">
+      <button class="mini fill" disabled>Finding the address…</button>
+    </div>`;
   if (!spotting) return `<div class="btnrow">
       <button class="mini fill" id="spotstart">Ask for a tree here anyway</button>
     </div>`;
   return `<form class="spotform" id="spotform">
-    <label class="flabel" for="spotaddr">The address you are standing at</label>
+    <label class="flabel" for="spotaddr">Couldn't name this spot — what is the address?</label>
     <input class="srinput" id="spotaddr" name="addr" autocomplete="off"
            placeholder="e.g. 623 W Stratford Pl" enterkeyhint="done">
     <div class="btnrow">
@@ -2138,6 +2277,28 @@ function spotForm(){
       <button class="mini ghost" type="button" id="spotcancel">Cancel</button>
     </div>
   </form>`;
+}
+
+/* One task for a place the city has no record of. The photo goes with it,
+   on this device, so the right picture is to hand when you file. */
+async function makeSpotTask(addr, zip){
+  const at = shot ? shot.at : null;
+  const file = shot ? shot.file : null;
+  if (!at) return;
+  const id = 'spot:' + Date.now().toString(36);
+  marks[id] = {
+    state: 'none', at: new Date().toISOString(),
+    site: { address: addr, sortKey: addr.toUpperCase(), zip: zip || '',
+            lat: at.lat, lng: at.lng, closed: '' }
+  };
+  if (reporter) marks[id].by = reporter;
+  SITES = SITES.concat([{ id, num:0, street:'', archived:true, ...marks[id].site }]);
+  await putPhoto(id, file);
+  closeShot();
+  await saveMarks();
+  tab = 'tasks'; detailId = null;
+  repaint();
+  toast(`Task made for ${addr}.`);
 }
 
 async function checkPhoto(file){
@@ -2153,7 +2314,9 @@ async function checkPhoto(file){
     return;
   }
   closeShot();
-  shot = { url: URL.createObjectURL(file), at, from };
+  // the file itself is kept, not just a preview: whichever task this photo
+  // ends up making, the picture goes with it
+  shot = { url: URL.createObjectURL(file), file, at, from };
   renderShot();
 }
 
@@ -2161,6 +2324,7 @@ function closeShot(){
   if (shot && shot.url) URL.revokeObjectURL(shot.url);
   shot = null;
   spotting = false;
+  locating = false;
   const el = $('#photosheet');
   if (el){ el.hidden = true; el.innerHTML = ''; }
 }
@@ -2307,6 +2471,40 @@ function cityLine(s){
   if (!s || !s.plantedAt) return '';
   return `<p class="city">City record: planting request${
     s.plantSr ? ` <b>${esc(s.plantSr)}</b>` : ''} opened ${longDate(s.plantedAt)}.</p>`;
+}
+
+/* The picture that made this task, on the phone that took it. 311 takes its
+   attachment from the phone's own picker, so this is not the file being
+   sent — it is which file to send. */
+function shotBlock(id, todo){
+  return `<div class="shotline" data-for="${esc(id)}" hidden>
+    <img class="tshot" data-shot="${esc(id)}" alt="">
+    <div class="shotsay">
+      <p>${todo
+        ? 'Your photo of this spot. The 311 form takes its own attachment — ' +
+          'this one is in your camera roll.'
+        : 'Your photo of this spot, kept on this device.'}</p>
+      <a class="linkish shotopen" target="_blank" rel="noopener" href="#">Open it full size</a>
+    </div>
+  </div>`;
+}
+
+/* A task the city has no record of was named by a lookup, and a lookup can
+   be a house number out. The address is what 311 acts on, so it stays
+   correctable. */
+function addrBlock(s){
+  if (!String(s.id).startsWith('spot:')) return '';
+  if (fixingAddr === s.id) return `<form class="spotform" data-addrfor="${esc(s.id)}">
+    <label class="flabel" for="addrfix">The address 311 should act on</label>
+    <input class="srinput" id="addrfix" name="addr" autocomplete="off"
+           value="${esc(s.address)}" enterkeyhint="done">
+    <div class="btnrow">
+      <button class="mini fill" type="submit">Save address</button>
+      <button class="linkish" type="button" data-addrcancel="1">Cancel</button>
+    </div>
+  </form>`;
+  return `<p class="tm addrnote">Address found from where you stood ·
+    <button class="linkish" data-addr="${esc(s.id)}">Fix it</button></p>`;
 }
 
 function noteBlock(id){
@@ -2490,7 +2688,9 @@ function renderTasks(){
       <h3>${esc(s.address)}</h3>
       <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''}${
         s.closed ? ` · removal ${s.id} closed ${longDate(s.closed)}` : ' · no removal on record'}</p>
+      ${addrBlock(s)}
       ${cityLine(s)}
+      ${shotBlock(s.id, !isDone)}
       ${noteBlock(s.id)}
       ${isDone ? `
         <p class="tm">${marks[s.id].sr
@@ -2540,6 +2740,7 @@ function renderTasks(){
         <p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
           : 'No removal on record'}${m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>
         ${cityLine(s)}
+        ${shotBlock(s.id)}
         ${noteBlock(s.id)}
         <div class="btnrow">
           <button class="mini ghost" data-file="${esc(s.id)}">${m.sr ? 'Edit number' : 'Add number'}</button>
@@ -2625,6 +2826,8 @@ function repaint(){
   if (tab === 'browse' && detailId) renderDetail();
   else if (tab === 'browse') renderBrowse();
   else renderTasks();
+  // the photos come from disk, so they arrive after the markup rather than with it
+  paintPhotos();
 }
 
 /* ============================================================
@@ -2669,9 +2872,27 @@ document.addEventListener('click', async e => {
     return;
   }
 
-  if (e.target.closest('#spotstart')){ spotting = true; renderShot();
-    const box = $('#spotaddr'); if (box) box.focus(); return; }
+  /* One tap. The coordinates are already known, so the address is looked up
+     rather than asked for; only a lookup that comes back empty falls through
+     to typing it. */
+  if (e.target.closest('#spotstart')){
+    if (!shot || locating) return;
+    locating = true; renderShot();
+    const found = await reverseAddress(shot.at);
+    locating = false;
+    if (!shot) return;                      // closed while we were waiting
+    if (found){ await makeSpotTask(found.address, found.zip); return; }
+    spotting = true; renderShot();
+    const box = $('#spotaddr'); if (box) box.focus();
+    toast('Could not name that spot — type the address.');
+    return;
+  }
   if (e.target.closest('#spotcancel')){ spotting = false; renderShot(); return; }
+
+  const af = e.target.closest('[data-addr]');
+  if (af){ fixingAddr = af.dataset.addr; repaint();
+    const box = $('#addrfix'); if (box){ box.focus(); box.select(); } return; }
+  if (e.target.closest('[data-addrcancel]')){ fixingAddr = null; repaint(); return; }
 
   if (e.target.closest('#shotbtn')){
     const inp = $('#shotfile');
@@ -2774,7 +2995,10 @@ document.addEventListener('click', async e => {
     // answering from the photo sheet is the same decision as answering on
     // the site's own card, so it lands in the same place
     const fromShot = !!mk.closest('#photosheet');
+    // the picture that answered the question belongs to the task it makes
+    const evidence = fromShot && st === 'none' && shot ? shot.file : null;
     if (fromShot) closeShot();
+    if (evidence) await putPhoto(id, evidence);
     // Answering from the map sheet should not end the walk: the sheet
     // updates in place and says what happened, and you carry on.
     const fromSheet = !!mk.closest('#pitsheet');
@@ -2823,6 +3047,8 @@ document.addEventListener('click', async e => {
   if (un){
     const id = un.dataset.undo, s = byId(id);
     lastUndo = { id, address: s ? s.address : id, prev: marks[id] };
+    // the report is going; the picture of it has nothing left to belong to
+    forgetPhoto(id);
     const note = marks[id] && marks[id].note;
     marks[id] = { state:'open', at:new Date().toISOString() };
     if (note) marks[id].note = note;   // what you saw there is still true
@@ -2880,19 +3106,24 @@ document.addEventListener('submit', async e => {
     e.preventDefault();
     const addr = (new FormData(sf).get('addr') || '').toString().trim().slice(0, 80);
     if (!addr || !shot){ toast('An address is needed for the 311 request.'); return; }
-    const id = 'spot:' + Date.now().toString(36);
-    marks[id] = {
-      state: 'none', at: new Date().toISOString(),
-      site: { address: addr, sortKey: addr.toUpperCase(), zip: '',
-              lat: shot.at.lat, lng: shot.at.lng, closed: '' }
-    };
-    if (reporter) marks[id].by = reporter;
-    SITES = SITES.concat([{ id, num:0, street:'', archived:true, ...marks[id].site }]);
-    closeShot();
+    await makeSpotTask(addr, '');
+    return;
+  }
+
+  const af = e.target.closest('[data-addrfor]');
+  if (af){
+    e.preventDefault();
+    const id = af.dataset.addrfor;
+    const addr = (new FormData(af).get('addr') || '').toString().trim().slice(0, 80);
+    if (!addr || !marks[id] || !marks[id].site){ fixingAddr = null; repaint(); return; }
+    marks[id] = { ...marks[id], at: new Date().toISOString(),
+      site: { ...marks[id].site, address: addr, sortKey: addr.toUpperCase() } };
+    // the loaded list carries its own copy of the site, so correct that too
+    SITES = SITES.map(s => s.id === id ? { ...s, address: addr, sortKey: addr.toUpperCase() } : s);
+    fixingAddr = null;
     await saveMarks();
-    tab = 'tasks'; detailId = null;
     repaint();
-    toast(`Task made for ${addr}.`);
+    toast(`Address set to ${addr}.`);
     return;
   }
 
