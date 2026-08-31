@@ -197,6 +197,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .dupwarn .dbody{margin:0 0 .5rem;color:var(--ink)}
 .dupwarn .dhit{margin:.25rem 0 0;color:var(--dim)}
 .dupwarn .dhit b{color:var(--ink);font-weight:600}
+/* the same evidence, made tappable so it can point at the map */
+button.dupshow{display:block;width:100%;text-align:left;border:0;
+  border-left:4px solid #C87A16;cursor:pointer;font:inherit;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem}
+button.dupshow .dshow{margin:.45rem 0 0;color:#8A5310;font-weight:600}
 /* what happened here, in one line under the pill */
 .statusline{
   margin:0 0 1rem;font-family:'IBM Plex Mono',monospace;
@@ -511,15 +516,23 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .sheetchoices{margin-bottom:.5rem}
 /* the deferral: full width under the pair, quieter, and it carries its
    own evidence so nothing has to be opened to weigh it */
+/* The third answer is an answer, not a notice: it is filled, it is the full
+   width of the pair above it, and it carries a chevron, so nothing about it
+   reads like the amber information boxes around it. */
 .act.knows{
-  display:block;width:100%;height:auto;padding:.7rem .85rem;text-align:left;
-  background:#FDF6EC;border:1px solid #E2BE86;color:#7A4A0E;
-  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.6;
+  display:flex;align-items:center;gap:.8rem;width:100%;height:auto;
+  padding:.8rem .9rem;margin-top:.55rem;text-align:left;
+  background:var(--ink);border:1px solid var(--ink);color:#fff;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.55;
   font-variation-settings:normal;text-transform:none;letter-spacing:0;
 }
-.act.knows b{display:block;font-size:.78rem;font-weight:600;margin-bottom:.1rem;
-  text-transform:uppercase;letter-spacing:.06em}
-.act.knows .late{color:#B3400A;font-weight:600}
+.act.knows .kw{flex:1;min-width:0}
+.act.knows b{display:block;font-size:.8rem;font-weight:600;margin-bottom:.15rem;
+  text-transform:uppercase;letter-spacing:.06em;color:#fff}
+.act.knows span span{color:#C9C7BE}
+.act.knows .late{color:#F2A25E;font-weight:600}
+.act.knows .kchev{flex:0 0 auto;font-size:1.2rem;line-height:1;opacity:.75}
+.act.knows:active{background:#2A2A2C}
 .nearline{
   display:block;width:100%;text-align:left;
   background:#FDF6EC;border:0;border-left:4px solid #C87A16;
@@ -840,6 +853,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
     <!-- no capture attribute: iOS then offers the camera *and* the library,
          and a library photo brings its own coordinates with it -->
     <input type="file" id="shotfile" accept="image/*" hidden>
+    <!-- a photo attached straight to a site, rather than used to find one -->
+    <input type="file" id="sitefile" accept="image/*" hidden>
 
     <section id="tasks" class="scroller" hidden>
       <!-- sync belongs where its consequence lands: these are the records
@@ -1058,10 +1073,11 @@ function ago(iso){
   const days = Math.floor((Date.now()-new Date(iso))/864e5);
   if (days < 1) return 'today';
   if (days === 1) return 'yesterday';
-  if (days < 45) return days+' days ago';
+  if (days < 45) return plural(days, 'day')+' ago';
   const mo = Math.round(days/30.4);
-  if (mo < 24) return mo+' months ago';
-  return Math.floor(days/365)+'+ years ago';
+  if (mo < 24) return plural(mo, 'month')+' ago';
+  // same shape as humanDays, so the button and the evidence beneath it agree
+  return (days/365).toFixed(1)+' years ago';
 }
 function longDate(iso){
   return new Date(iso).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
@@ -1176,9 +1192,12 @@ function plantStats(rows){
   };
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/* Days are floored, not rounded, so "open 3 days" and "requested 3 days ago"
+   describe the same request with the same number. */
 const humanDays = d =>
-  d < 45 ? `${Math.round(d)} days`
-  : d < 400 ? `${Math.round(d / 30.4)} months`
+  d < 45 ? plural(Math.floor(d), 'day')
+  : d < 400 ? plural(Math.round(d / 30.4), 'month')
   : `${(d / 365).toFixed(1)} years`;
 
 /* This request, measured against the ward's own record. */
@@ -1262,10 +1281,13 @@ function staleWait(s){
 function knowsButton(s, hits){
   const a = requestAge(hits[0].p);
   return `<button class="act knows" data-mark="${esc(s.id)}::wait">
-      <b>City already knows</b>
-      <span>${hits.length === 1 ? 'a request' : hits.length + ' requests'} nearby ·
-        nearest ${dist(hits[0].ft / FT_PER_MI)} · <span class="${a.late ? 'late' : ''}"
-        >${esc(a.note)}</span></span>
+      <span class="kw">
+        <b>City already knows</b>
+        <span>${hits.length === 1 ? 'a request' : hits.length + ' requests'} nearby ·
+          nearest ${dist(hits[0].ft / FT_PER_MI)} · <span class="${a.late ? 'late' : ''}"
+          >${esc(a.note)}</span></span>
+      </span>
+      <span class="kchev" aria-hidden="true">›</span>
     </button>`;
 }
 
@@ -1274,11 +1296,14 @@ function knowsButton(s, hits){
 function dupWarning(s, compact){
   const hits = nearbyRequests(s);
   if (!hits.length) return '';
-  // on the card the line above has already said it; here just show them
-  if (compact) return `<div class="dupwarn">
+  /* On the card the button above has already made the case, so this is just
+     the evidence — and tapping it puts those requests on the map, which is
+     the one thing the button cannot do. */
+  if (compact) return `<button class="dupwarn dupshow" data-shownear="${esc(s.id)}">
     ${hits.map(({p, ft}) => `<p class="dhit"><b>${esc(p.address)}</b> ·
       ${dist(ft / FT_PER_MI)} away · ${esc(p.id)} · requested ${ago(p.at)}</p>`).join('')}
-  </div>`;
+    <p class="dshow">Show ${hits.length === 1 ? 'it' : 'them'} on the map ›</p>
+  </button>`;
   return `<div class="dupwarn">
     <p class="dhead">Check this isn't a duplicate</p>
     <p class="dbody">The city already has ${hits.length === 1
@@ -1475,6 +1500,7 @@ function killMini(){
 }
 let filing = null;      // task id whose request-number form is open
 let fixingAddr = null;  // spot task whose looked-up address is being corrected
+let shotFor = null;     // site the picker was opened for
 let lastUndo = null;     // {id, address, prev} so an undo can be taken back
 let reporter = '';       // optional name, so shared reports say who checked
 let guest = false;       // arrived through someone else's share link
@@ -1774,7 +1800,17 @@ function quietRow(s){
                 fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round"/>
         </svg>Ask someone</button>
-    </div>`;
+      ${/* A picture of what you are standing in front of, kept with the site,
+            so the filing can be done later at a desk with the evidence to
+            hand. Subtle, because most sites will not need one. */''}
+      <button class="qact" data-addshot="${esc(s.id)}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 8h3.5L8 5.5h8L17.5 8H21v12H3z" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="12" cy="13.5" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>${hasPhoto.has(s.id) ? 'Replace photo' : 'Add photo'}</button>
+    </div>
+    ${shotBlock(s.id)}`;
 }
 
 /* The facts are short enough to just be there. A disclosure asked you to
@@ -2002,7 +2038,9 @@ function renderSheet(){
     <div class="sheetbody">
       <div class="peekpart">
         ${statusLine(s)}
-        ${near.length && (st === 'open' || st === 'none') ? `<button class="nearline" data-shownear="${esc(s.id)}">
+        ${/* Where the third answer is offered it says all of this itself, so
+              the banner would be the same sentence twice. */
+          near.length && st === 'none' ? `<button class="nearline" data-shownear="${esc(s.id)}">
             ${near.length === 1 ? 'A planting request is' : near.length + ' planting requests are'}
             already open nearby — nearest ${dist(near[0].ft / FT_PER_MI)}, shown on the map</button>` : ''}
         ${decision}
@@ -2016,6 +2054,8 @@ function renderSheet(){
     </div>`;
   el.hidden = false;
   requestAnimationFrame(() => { measurePeek(); el.classList.add('up'); paintCardState(); });
+  // the card is rebuilt from scratch here, so any photo on it needs redrawing
+  paintPhotos();
 }
 
 /* How much of the card shows at rest — measured from its own content, so a
@@ -2177,8 +2217,17 @@ async function photoOp(mode, run){
 const getPhoto = id => photoOp('readonly',  st => st.get(id));
 const delPhoto = id => photoOp('readwrite', st => st.delete(id));
 
+/* Which sites have one, known without a round trip, so a label can say
+   "Add" or "Replace" while the markup is being built. */
+const hasPhoto = new Set();
+async function loadPhotoKeys(){
+  const keys = await photoOp('readonly', st => st.getAllKeys());
+  if (Array.isArray(keys)) for (const k of keys) hasPhoto.add(k);
+}
+
 async function putPhoto(id, file){
   if (!file) return;
+  hasPhoto.add(id);
   // Ask the browser to treat this as worth keeping. Safari clears ordinary
   // site data after about a week of not visiting; granted or not, the task
   // itself is safe — it syncs — so a lost picture is a lost picture only.
@@ -2212,6 +2261,7 @@ function forgetPhoto(id){
   const url = photoSrc.get(id);
   if (url) URL.revokeObjectURL(url);
   photoSrc.delete(id);
+  hasPhoto.delete(id);
   delPhoto(id);
 }
 
@@ -2485,6 +2535,7 @@ function shotBlock(id, todo){
           'this one is in your camera roll.'
         : 'Your photo of this spot, kept on this device.'}</p>
       <a class="linkish shotopen" target="_blank" rel="noopener" href="#">Open it full size</a>
+      <button class="linkish" data-dropshot="${esc(id)}">Remove</button>
     </div>
   </div>`;
 }
@@ -2556,22 +2607,8 @@ function renderDetail(){
     <button class="back" id="back">‹ All sites</button>
     <h2 class="daddr">${esc(s.address)}</h2>
 
-    <div class="quiet">
-      <a class="qact" target="_blank" rel="noopener"
-         href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"
-                fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          <circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
-        </svg>Directions</a>
-      <button class="qact" data-share="${esc(s.id)}">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"
-                fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>Ask someone</button>
-    </div>
-
+    ${/* the tools live at the bottom of the page, once — this used to carry
+          a second copy of them under the address */''}
     ${statusLine(s)}
     ${(st === 'open' || st === 'none') ? dupWarning(s) : ''}
     <div class="mapbox">
@@ -2889,6 +2926,23 @@ document.addEventListener('click', async e => {
   }
   if (e.target.closest('#spotcancel')){ spotting = false; renderShot(); return; }
 
+  const shotAdd = e.target.closest('[data-addshot]');
+  if (shotAdd){
+    shotFor = shotAdd.dataset.addshot;
+    const inp = $('#sitefile');
+    if (inp){ inp.value = ''; inp.click(); }
+    return;
+  }
+  const shotDrop = e.target.closest('[data-dropshot]');
+  if (shotDrop){
+    const id = shotDrop.dataset.dropshot;
+    forgetPhoto(id);
+    repaint();
+    if (picked === id) renderSheet();
+    toast('Photo removed.');
+    return;
+  }
+
   const af = e.target.closest('[data-addr]');
   if (af){ fixingAddr = af.dataset.addr; repaint();
     const box = $('#addrfix'); if (box){ box.focus(); box.select(); } return; }
@@ -3157,10 +3211,21 @@ document.addEventListener('submit', async e => {
   repaint();
 });
 
-document.addEventListener('change', e => {
-  if (e.target.id !== 'shotfile') return;
-  const file = e.target.files && e.target.files[0];
-  if (file) checkPhoto(file);
+document.addEventListener('change', async e => {
+  if (e.target.id === 'shotfile'){
+    const file = e.target.files && e.target.files[0];
+    if (file) checkPhoto(file);
+    return;
+  }
+  if (e.target.id === 'sitefile'){
+    const file = e.target.files && e.target.files[0];
+    const id = shotFor; shotFor = null;
+    if (!file || !id) return;
+    await putPhoto(id, file);
+    repaint();
+    if (picked === id) renderSheet();
+    toast('Photo saved with this site.');
+  }
 });
 
 let qt;
@@ -3230,6 +3295,9 @@ function fallbackCopy(text, done){
 
   // A previous grant means the browser will not prompt, so this is silent.
   if (await Store.get('stump.geo')) findMe();
+
+  // which sites already have a picture, so the labels are right on first paint
+  await loadPhotoKeys();
 
   await pullMarks({ quiet:true });
   if (Object.keys(marks).length) await pushMarks();
