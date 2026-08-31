@@ -101,7 +101,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pane > .scroller{flex:1}
 .search{
   flex:1;min-width:9rem;
-  font-family:'IBM Plex Mono',monospace;font-size:.82rem;
+  font-family:'IBM Plex Mono',monospace;font-size:1rem;
   padding:.6rem .7rem;border:1px solid var(--line);background:var(--paper);
   color:var(--ink);border-radius:0;min-height:2.7rem;
 }
@@ -508,7 +508,18 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pitsheet .grip{transition:background .15s}
 .dragzone:active .grip{background:var(--dim)}
 /* the same two-button decision as the site page, at the same size */
-.sheetchoices{margin-bottom:.2rem}
+.sheetchoices{margin-bottom:.5rem}
+/* the deferral: full width under the pair, quieter, and it carries its
+   own evidence so nothing has to be opened to weigh it */
+.act.knows{
+  display:block;width:100%;height:auto;padding:.7rem .85rem;text-align:left;
+  background:#FDF6EC;border:1px solid #E2BE86;color:#7A4A0E;
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;line-height:1.6;
+  font-variation-settings:normal;text-transform:none;letter-spacing:0;
+}
+.act.knows b{display:block;font-size:.78rem;font-weight:600;margin-bottom:.1rem;
+  text-transform:uppercase;letter-spacing:.06em}
+.act.knows .late{color:#B3400A;font-weight:600}
 .nearline{
   display:block;width:100%;text-align:left;
   background:#FDF6EC;border:0;border-left:4px solid #C87A16;
@@ -526,19 +537,29 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .sheetwrap{position:fixed;inset:0;z-index:1500;display:flex;align-items:flex-end}
 .sheetwrap::before{content:'';position:absolute;inset:0;background:rgba(11,11,12,.45)}
 .sheet{
-  position:relative;width:100%;max-height:82vh;overflow-y:auto;
-  background:var(--paper);border-top:3px solid var(--ink);
-  padding:1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+  position:relative;width:100%;max-height:86dvh;overflow-y:auto;
+  background:var(--paper);border-top:1px solid var(--line);
+  border-radius:1rem 1rem 0 0;
+  box-shadow:0 -6px 24px rgba(11,11,12,.16);
+  padding:.5rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
 }
-.sheet .shead{display:flex;align-items:flex-start;gap:.9rem;margin-bottom:1rem}
-.sheet .shot{width:5.5rem;height:5.5rem;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
-.sheet .sfrom{font-family:'IBM Plex Mono',monospace;font-size:.62rem;line-height:1.6;
+.sheet .grip{
+  width:2.75rem;height:.3rem;border-radius:3px;background:#C9C7C0;
+  margin:.35rem auto .75rem;
+}
+.sheet .shead{display:flex;align-items:flex-start;gap:.85rem;margin-bottom:1rem}
+.sheet .shot{width:4.4rem;height:4.4rem;object-fit:cover;border:1px solid var(--line);
+  border-radius:.35rem;flex:0 0 auto}
+.sheet .sfrom{font-family:'IBM Plex Mono',monospace;font-size:.6rem;line-height:1.6;
   color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
 .sheet h3{
   font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
-  font-size:1.3rem;line-height:1.1;margin:.3rem 0 .35rem;overflow-wrap:break-word;
+  font-size:1.35rem;line-height:1.1;margin:.1rem 0 .3rem;overflow-wrap:break-word;
 }
-.sheet .sdist{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim)}
+.sheet .sdist{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);line-height:1.7}
+.spotform{margin-top:1rem}
+.spotform .srinput{width:100%;margin:.35rem 0 0}
+.spotform .btnrow{margin-top:.7rem}
 .verdict{
   padding:.75rem .85rem;margin:.9rem 0;
   font-family:'IBM Plex Mono',monospace;font-size:.7rem;line-height:1.6;
@@ -570,8 +591,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .notebtn.empty{color:var(--dim);text-transform:uppercase;letter-spacing:.07em;font-size:.64rem}
 .notebtn:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
 .noteform{margin:0 0 1rem}
+/* 16px or iOS zooms the whole page the moment you tap in */
 .noteinput{
-  width:100%;font:inherit;font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  width:100%;font:inherit;font-family:'IBM Plex Mono',monospace;font-size:1rem;
   line-height:1.6;padding:.6rem;border:1px solid var(--ink);border-radius:0;
   background:var(--paper);color:var(--ink);resize:vertical;
 }
@@ -665,7 +687,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .srrow{display:flex;gap:.5rem;margin-bottom:.5rem}
 .srinput{
   flex:1;min-width:0;
-  font-family:'IBM Plex Mono',monospace;font-size:.85rem;
+  font-family:'IBM Plex Mono',monospace;font-size:1rem;
   padding:.6rem .7rem;border:1px solid var(--ink);background:var(--paper);
   color:var(--ink);border-radius:0;min-height:2.9rem;
 }
@@ -1222,27 +1244,18 @@ function staleWait(s){
    real outcome of a visit and neither of the two answers covers it, so it
    gets its own one — and the choice is put next to the evidence rather
    than left to memory. */
-function chooserBlock(s){
-  const hits = nearbyRequests(s);
-  if (!hits.length) return '';
-  const dupPct = Math.round(PLANT_STATS.dupShare * 100);
-  return `<div class="chooser">
-    <p class="chead">Empty — but a tree has already been asked for</p>
-    ${hits.slice(0,2).map(({p, ft}) => {
-      const a = requestAge(p);
-      return `<p class="chit"><b>${esc(p.address)}</b> · ${dist(ft / FT_PER_MI)} away<br>
-        <span class="${a.late ? 'late' : ''}">${esc(a.note)}</span></p>`;
-    }).join('')}
-    <p class="cnote">${dupPct >= 2
-      ? `${dupPct}% of this ward's planting requests are already marked duplicates, so a
-         second one is likely to be merged into the first rather than counted twice.`
-      : `A second request at the same address is normally merged into the first.`}</p>
-    <div class="btnrow">
-      <button class="mini fill" data-mark="${esc(s.id)}::wait">It's in the queue</button>
-      <button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>
-    </div>
-    <button class="linkish ccancel" data-choosecancel>Back</button>
-  </div>`;
+/* The third answer, offered only when there is something to defer to: the
+   pit is empty and the city already has a request that covers it. It says
+   how old that request is, because a five-month wait and a three-year wait
+   are different situations. */
+function knowsButton(s, hits){
+  const a = requestAge(hits[0].p);
+  return `<button class="act knows" data-mark="${esc(s.id)}::wait">
+      <b>City already knows</b>
+      <span>${hits.length === 1 ? 'a request' : hits.length + ' requests'} nearby ·
+        nearest ${dist(hits[0].ft / FT_PER_MI)} · <span class="${a.late ? 'late' : ''}"
+        >${esc(a.note)}</span></span>
+    </button>`;
 }
 
 /* Said in full where a request is about to be filed, and in one line
@@ -1308,11 +1321,14 @@ function packet(s){
   const note = (marks[s.id] && marks[s.id].note) || '';
   return {
     'Request type': 'Tree Planting Request',
-    'Address': `${s.address}, Chicago, IL ${s.zip}`,
+    'Address': `${s.address}, Chicago, IL${s.zip ? ' ' + s.zip : ''}`,
     'Where would you like the tree(s) planted?':
-      `On the public parkway in front of ${s.address}. The parkway tree at this ` +
-      `location was removed by the city and the tree pit is now empty. ` +
-      `Prior removal service request ${s.id}, closed ${longDate(s.closed)}. ` +
+      `On the public parkway in front of ${s.address}. ` +
+      (s.closed
+        ? `The parkway tree at this location was removed by the city and the tree ` +
+          `pit is now empty. Prior removal service request ${s.id}, closed ` +
+          `${longDate(s.closed)}. `
+        : `The parkway here has an empty tree pit with no tree in it. `) +
       `Site verified empty in person on ${longDate(when)}.` +
       // whatever the person standing there saw, in their own words
       (note ? ` Noted on site: ${note}` : ''),
@@ -1336,7 +1352,6 @@ let picked = null;        // the pin whose sheet is up
 let sheetFull = false;    // is the card pulled up to its full height
 let mapFramed = false;    // the opening view is set once, then the map is yours
 let noting = null;        // site id whose note is being written
-let choosing = null;      // site id being asked "already requested, or ask again?"
 let PLANT_STATS = { n:0, total:0, dupShare:0, median:null };
 let noteDraft = '';       // what is in the box, so a sync pull can't wipe it
 let detailsOpen = false;   // survives a re-render, so a sync pull can't snap it shut
@@ -1471,7 +1486,7 @@ function filtered(){
   // "closest" means closest to you when we know where you are, home otherwise
   const from = me || HOME;
   if (sort === 'near')      list.sort((a,b) => miles(from,a) - miles(from,b));
-  else if (sort === 'new')  list.sort((a,b) => b.closed.localeCompare(a.closed));
+  else if (sort === 'new')  list.sort((a,b) => (b.closed||'').localeCompare(a.closed||''));
   else                      list.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
   return list;
 }
@@ -1552,7 +1567,7 @@ function renderBrowse(){
     return `<button class="row" data-open="${esc(s.id)}">
       <span class="rmain">
         <span class="raddr">${esc(s.address)}</span>
-        <span class="rmeta">Removal closed ${ago(s.closed)} · ${miles(HOME,s).toFixed(2)} mi from home${
+        <span class="rmeta">${s.closed ? `Removal closed ${ago(s.closed)}` : 'Added from a photo'} · ${miles(HOME,s).toFixed(2)} mi from home${
           dup ? ` · <b class="dflag">request nearby</b>` : ''}</span>
       </span>
       ${label ? `<span class="pill ${cls}">${label}</span>` : ''}
@@ -1787,13 +1802,14 @@ function factsList(s){
   const st = stateOf(s), m = marks[s.id], when = m && m.at;
   return `<div class="more open">
       <dl class="facts">
-        <div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
-        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>
+        ${s.closed ? `<div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
+        <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>`
+        : `<div class="fact"><dt>Removal record</dt><dd>none — added from a photo</dd></div>`}
         ${st === 'req' && !(m && m.sr) ? `<div class="fact"><dt>Planting request</dt>
           <dd><span class="nosr">not recorded</span></dd></div>` : ''}
         ${st === 'none' && when ? `<div class="fact"><dt>Gap confirmed</dt><dd>${longDate(when)}${
           m && m.by ? ' · '+esc(m.by) : ''}</dd></div>` : ''}
-        <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
+        ${s.zip ? `<div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>` : ''}
         <div class="fact"><dt>From ${me ? 'you' : 'home'}</dt><dd>${(me?miles(me,s):miles(HOME,s)).toFixed(2)} mi</dd></div>
       </dl>
     </div>`;
@@ -1891,10 +1907,13 @@ function pick(id){
     if (m){
       const z = Math.max(map.getZoom(), 17);
       map.setView(m.getLatLng(), z);
-      // lift the pin clear of the card that just covered the lower half
+      /* Lift the pin clear of the card. The offset is half of what the
+         card actually shows — its peek — not half the card, which is now
+         most of the screen and threw the pin off the top. */
       requestAnimationFrame(() => {
-        const h = ($('#pitsheet') || {}).offsetHeight || 0;
-        if (h) map.panBy([0, h / 2], { animate:true, duration:.25 });
+        const el = $('#pitsheet');
+        const peek = el ? parseFloat(getComputedStyle(el).getPropertyValue('--peek')) : 0;
+        if (peek > 0) map.panBy([0, Math.round(peek / 2)], { animate:true, duration:.25 });
       });
     }
     renderMap(currentSpecs());
@@ -1945,16 +1964,15 @@ function renderSheet(){
   const near = nearbyRequests(s);
   const [cls, label] = PILL[st];
 
-  const decision = choosing === s.id ? chooserBlock(s)
-    : st === 'open'
+  const decision = st === 'open'
     ? `<div class="choices sheetchoices">
          <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
-         <button class="act no" ${near.length ? `data-choose="${esc(s.id)}"`
-           : `data-mark="${esc(s.id)}::none"`}>No<br>tree</button>
-       </div>`
+         <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+       </div>
+       ${near.length ? knowsButton(s, near) : ''}`
     : `<div class="btnrow">
          ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>` : ''}
-         ${st === 'wait' ? `<button class="mini ghost" data-choose="${esc(s.id)}">Ask again?</button>` : ''}
+         ${st === 'wait' ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>` : ''}
          <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
        </div>`;
 
@@ -1966,7 +1984,7 @@ function renderSheet(){
       <button class="sheetx" id="pitclose" aria-label="Close">×</button>
       <p class="pkind">${label ? `<span class="pill ${cls}">${label}</span>` : 'Not checked yet'}</p>
       <h3>${esc(s.address)}</h3>
-      <p class="pmeta">Removal closed ${ago(s.closed)}${
+      <p class="pmeta">${s.closed ? `Removal closed ${ago(s.closed)}` : 'No removal on record'}${
         me ? ` · ${dist(miles(me, s))} from you` : ''}</p>
     </div>
     <div class="sheetbody">
@@ -1978,7 +1996,7 @@ function renderSheet(){
         ${decision}
       </div>
       <div class="restpart">
-        ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s, true) : ''}
+        ${(st === 'open' || st === 'none') ? dupWarning(s, true) : ''}
         ${factsList(s)}
         ${noteBlock(s.id)}
         ${quietRow(s)}
@@ -2100,7 +2118,27 @@ function tiffGPS(v, base){
   return out;
 }
 
-let shot = null;   // { url, at:{lat,lng}, from:'photo'|'you' }
+let shot = null;      // { url, at:{lat,lng}, from:'photo'|'you' }
+let spotting = false; // typing the address for a pit the city never recorded
+
+/* A stump the removal records never caught is still a stump. The app finds
+   candidates from those records, so it has no address for this one — but a
+   planting request does not need a removal behind it, only a place. You
+   supply the address; everything else comes from where you are standing. */
+function spotForm(){
+  if (!spotting) return `<div class="btnrow">
+      <button class="mini fill" id="spotstart">Ask for a tree here anyway</button>
+    </div>`;
+  return `<form class="spotform" id="spotform">
+    <label class="flabel" for="spotaddr">The address you are standing at</label>
+    <input class="srinput" id="spotaddr" name="addr" autocomplete="off"
+           placeholder="e.g. 623 W Stratford Pl" enterkeyhint="done">
+    <div class="btnrow">
+      <button class="mini fill" type="submit">Make the task</button>
+      <button class="mini ghost" type="button" id="spotcancel">Cancel</button>
+    </div>
+  </form>`;
+}
 
 async function checkPhoto(file){
   if (!file) return;
@@ -2122,6 +2160,7 @@ async function checkPhoto(file){
 function closeShot(){
   if (shot && shot.url) URL.revokeObjectURL(shot.url);
   shot = null;
+  spotting = false;
   const el = $('#photosheet');
   if (el){ el.hidden = true; el.innerHTML = ''; }
 }
@@ -2178,10 +2217,11 @@ function renderShot(){
     ? `<p class="msg">No removal records loaded yet.</p>`
     : !inRange.length
     ? `<h3>Nothing on record here</h3>
-       <p class="sdist">The nearest removal the city lists is
-         ${esc(hit.s.address)}, ${dist(hit.ft / FT_PER_MI)} away. Stump works from
-         the city's removal records, so a pit with no removal behind it isn't one
-         it can file for.</p>`
+       <p class="sdist">The city lists no removal within
+         ${dist(CANDIDATE_FT / FT_PER_MI)} — the nearest is ${esc(hit.s.address)},
+         ${dist(hit.ft / FT_PER_MI)} away. A tree can still be asked for at a spot
+         the removal records never caught.</p>
+       ${spotForm()}`
     : pick
     ? verdictFor(pick, inRange.filter(n => n.s.id !== pick.s.id))
     : `<h3>Which pit is this?</h3>
@@ -2191,6 +2231,7 @@ function renderShot(){
        ${candidates(inRange)}`;
 
   el.innerHTML = `<div class="sheet">
+    <div class="grip"></div>
     <button class="sclose" id="shotclose">Close</button>
     <div class="shead">
       <img class="shot" src="${shot.url}" alt="">
@@ -2209,10 +2250,10 @@ function verdictFor(hit, rest){
   const near = nearbyRequests(s);
   const action = st === 'open'
     ? `<div class="btnrow">
-         <button class="mini fill" ${near.length ? `data-choose="${esc(s.id)}"`
-           : `data-mark="${esc(s.id)}::none"`}>No tree — make the task</button>
+         <button class="mini fill" data-mark="${esc(s.id)}::none">No tree — make the task</button>
          <button class="mini ghost" data-mark="${esc(s.id)}::tree">Tree is here</button>
-       </div>`
+       </div>
+       ${near.length ? knowsButton(s, near) : ''}`
     : st === 'none'
     ? `<div class="btnrow">
          <button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>
@@ -2296,16 +2337,14 @@ function renderDetail(){
   const m = marks[s.id];
   const when = m && m.at;
 
-  // "no tree" where a request is already open is a question, not an answer
-  const asksFirst = nearbyRequests(s).length > 0;
-  const choices = choosing === s.id ? chooserBlock(s)
-    : st === 'open' ? `
+  const nearHere = nearbyRequests(s);
+  const choices = st === 'open' ? `
       <p class="ask">Is there a tree in the parkway?</p>
       <div class="choices">
         <button class="act" data-mark="${esc(s.id)}::tree">Tree<br>is here</button>
-        <button class="act no" ${asksFirst ? `data-choose="${esc(s.id)}"`
-          : `data-mark="${esc(s.id)}::none"`}>No<br>tree</button>
-      </div>`
+        <button class="act no" data-mark="${esc(s.id)}::none">No<br>tree</button>
+      </div>
+      ${nearHere.length ? knowsButton(s, nearHere) : ''}`
     : `<div class="btnrow">
         ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to task</button>` : ''}
         ${st === 'req'  ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen task</button>` : ''}
@@ -2336,7 +2375,7 @@ function renderDetail(){
     </div>
 
     ${statusLine(s)}
-    ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
+    ${(st === 'open' || st === 'none') ? dupWarning(s) : ''}
     <div class="mapbox">
       <div id="minimap"></div>
       <button class="recenter" id="recenter">Recenter</button>
@@ -2449,8 +2488,8 @@ function renderTasks(){
     const by = marks[s.id].by;
     return `<article class="task${isDone?' done':''}">
       <h3>${esc(s.address)}</h3>
-      <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''} ·
-        removal ${s.id} closed ${longDate(s.closed)}</p>
+      <p class="tm">Reported ${ago(marks[s.id].at)}${by ? ` by <b>${esc(by)}</b>` : ''}${
+        s.closed ? ` · removal ${s.id} closed ${longDate(s.closed)}` : ' · no removal on record'}</p>
       ${cityLine(s)}
       ${noteBlock(s.id)}
       ${isDone ? `
@@ -2498,8 +2537,8 @@ function renderTasks(){
         <span class="drchev">›</span>
       </summary>
       <div class="drbody">
-        <p class="tm">Removal ${esc(s.id)} closed ${longDate(s.closed)}${
-          m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>
+        <p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
+          : 'No removal on record'}${m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>
         ${cityLine(s)}
         ${noteBlock(s.id)}
         <div class="btnrow">
@@ -2528,7 +2567,8 @@ function renderTasks(){
         <span class="drchev">›</span>
       </summary>
       <div class="drbody">
-        <p class="tm">Removal ${esc(s.id)} closed ${longDate(s.closed)}</p>
+        <p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
+          : 'No removal on record'}</p>
         ${cityLine(s)}
         ${noteBlock(s.id)}
         <div class="btnrow">
@@ -2619,12 +2659,19 @@ document.addEventListener('click', async e => {
     const near = s ? nearbyRequests(s) : [];
     if (s && near.length){
       const pts = [[s.lat, s.lng], ...near.map(({p}) => [p.lat, p.lng])];
-      const h = ($('#pitsheet') || {}).offsetHeight || 0;
+      // reserve only what the card actually covers — the card itself is
+      // nearly full height, and padding by that leaves nothing to fit into
+      const el = $('#pitsheet');
+      const h = el ? parseFloat(getComputedStyle(el).getPropertyValue('--peek')) || 0 : 0;
       map.fitBounds(L.latLngBounds(pts).pad(0.6),
         { paddingBottomRight:[0, h], maxZoom: 19 });
     }
     return;
   }
+
+  if (e.target.closest('#spotstart')){ spotting = true; renderShot();
+    const box = $('#spotaddr'); if (box) box.focus(); return; }
+  if (e.target.closest('#spotcancel')){ spotting = false; renderShot(); return; }
 
   if (e.target.closest('#shotbtn')){
     const inp = $('#shotfile');
@@ -2701,18 +2748,6 @@ document.addEventListener('click', async e => {
   const goto = e.target.closest('[data-goto-task]');
   if (goto){ closeShot(); unpick(); tab = 'tasks'; detailId = null; repaint(); return; }
 
-  const ch = e.target.closest('[data-choose]');
-  if (ch){
-    choosing = ch.dataset.choose;
-    if (picked === choosing) renderSheet(); else repaint();
-    return;
-  }
-  if (e.target.closest('[data-choosecancel]')){
-    const was = choosing; choosing = null;
-    if (picked === was) renderSheet(); else repaint();
-    return;
-  }
-
   const nb = e.target.closest('[data-note]');
   if (nb){
     noting = nb.dataset.note;
@@ -2743,7 +2778,6 @@ document.addEventListener('click', async e => {
     // Answering from the map sheet should not end the walk: the sheet
     // updates in place and says what happened, and you carry on.
     const fromSheet = !!mk.closest('#pitsheet');
-    choosing = null;
     const prev = marks[id] || {};
     marks[id] = { state: st, at: new Date().toISOString() };
     // a note describes the site, not the answer, so it outlives a re-report
@@ -2841,6 +2875,27 @@ document.addEventListener('toggle', e => {
 }, true);
 
 document.addEventListener('submit', async e => {
+  const sf = e.target.closest('#spotform');
+  if (sf){
+    e.preventDefault();
+    const addr = (new FormData(sf).get('addr') || '').toString().trim().slice(0, 80);
+    if (!addr || !shot){ toast('An address is needed for the 311 request.'); return; }
+    const id = 'spot:' + Date.now().toString(36);
+    marks[id] = {
+      state: 'none', at: new Date().toISOString(),
+      site: { address: addr, sortKey: addr.toUpperCase(), zip: '',
+              lat: shot.at.lat, lng: shot.at.lng, closed: '' }
+    };
+    if (reporter) marks[id].by = reporter;
+    SITES = SITES.concat([{ id, num:0, street:'', archived:true, ...marks[id].site }]);
+    closeShot();
+    await saveMarks();
+    tab = 'tasks'; detailId = null;
+    repaint();
+    toast(`Task made for ${addr}.`);
+    return;
+  }
+
   const nf = e.target.closest('.noteform');
   if (nf){
     e.preventDefault();
