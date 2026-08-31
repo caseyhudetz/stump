@@ -197,6 +197,15 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .dupwarn .dbody{margin:0 0 .5rem;color:var(--ink)}
 .dupwarn .dhit{margin:.25rem 0 0;color:var(--dim)}
 .dupwarn .dhit b{color:var(--ink);font-weight:600}
+/* what happened here, in one line under the pill */
+.statusline{
+  margin:0 0 1rem;font-family:'IBM Plex Mono',monospace;
+  font-size:.66rem;line-height:1.7;color:var(--dim);
+}
+.statusline b{color:var(--ink);font-weight:600}
+.statusline.req{color:var(--ok)}
+.statusline.none{color:var(--hot)}
+.statusline.wait{color:#8A5310}
 .dflag{color:#8A5310;font-weight:600}
 /* a planting request is a fact to look at, not a site to decide about */
 .row.static{cursor:default}
@@ -294,10 +303,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   pointer-events:none;
 }
 /* checked: hollow, so it recedes without disappearing */
-.pin.done{background:var(--paper);border-color:var(--dim);box-shadow:0 1px 3px rgba(11,11,12,.3)}
-.pin.done::after{
-  content:'';display:block;width:.34rem;height:.34rem;border-radius:50%;
-  background:var(--dim);margin:.29rem auto;
+/* checked: smaller and quieter, so the ones still to do carry the weight */
+.pin.done{
+  width:.7rem;height:.7rem;margin:.15rem;
+  background:#9A9A93;box-shadow:0 1px 2px rgba(11,11,12,.3);
 }
 .pin.plant{background:#C87A16}
 /* checked, empty, and already in the city's queue — amber, but ringed so
@@ -477,8 +486,12 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   font-variation-settings:'wdth' 78,'wght' 700;text-transform:uppercase;
   font-size:1.35rem;line-height:1.1;margin:.1rem 0 .3rem;overflow-wrap:break-word;
 }
-.pkind{margin:0 0 .1rem;font-family:'IBM Plex Mono',monospace;font-size:.6rem;
-  text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.pkind{
+  display:flex;align-items:center;margin:0 0 .5rem;min-height:1.2rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--dim);
+}
+.pkind .pill{padding:.3rem .5rem;line-height:1}
 .pkind.plantk{color:#8A5310}
 .pmeta{margin:0 0 .8rem;font-family:'IBM Plex Mono',monospace;
   font-size:.64rem;color:var(--dim);line-height:1.6}
@@ -1234,9 +1247,14 @@ function chooserBlock(s){
 
 /* Said in full where a request is about to be filed, and in one line
    wherever a site is merely listed. */
-function dupWarning(s){
+function dupWarning(s, compact){
   const hits = nearbyRequests(s);
   if (!hits.length) return '';
+  // on the card the line above has already said it; here just show them
+  if (compact) return `<div class="dupwarn">
+    ${hits.map(({p, ft}) => `<p class="dhit"><b>${esc(p.address)}</b> ·
+      ${dist(ft / FT_PER_MI)} away · ${esc(p.id)} · requested ${ago(p.at)}</p>`).join('')}
+  </div>`;
   return `<div class="dupwarn">
     <p class="dhead">Check this isn't a duplicate</p>
     <p class="dbody">The city already has ${hits.length === 1
@@ -1734,17 +1752,35 @@ function quietRow(s){
 
 /* The facts are short enough to just be there. A disclosure asked you to
    open something before you could see four lines. */
-function banners(s){
-  const st = stateOf(s), m = marks[s.id], when = m && m.at;
-  const b = st === 'none' ? `<div class="state none">
-        Reported <b>no tree</b> ${when?ago(when):''} — a task is waiting for you under <b>Tasks</b>.</div>`
-    : st === 'req' ? `<div class="state req">Planting request <b>filed</b> ${when?ago(when):''}${
-        m && m.sr ? ` · <b>${esc(m.sr)}</b>` : ''}.</div>`
-    : st === 'tree' ? `<div class="state tree">Marked as <b>still having a tree</b> ${when?ago(when):''}.</div>`
-    : st === 'wait' ? `<div class="state wait">Empty, and <b>already in the city's queue</b>
-        ${when?'as of '+ago(when):''}.${staleWait(s)}</div>`
-    : '';
-  return b + cityLine(s);
+/* One line, not three boxes.
+
+   A filed site used to say "FILED" on the pill, "Planting request filed
+   today · SR26-…" in a banner, and "City record: planting request SR26-…
+   opened 30 August" underneath — the same number three times over. The
+   pill names the state; this carries only what the pill cannot: when,
+   which number, and whether the city's own record agrees. */
+function statusLine(s){
+  const st = stateOf(s), m = marks[s.id] || {}, when = m.at;
+  if (st === 'open') return '';
+  const bits = [];
+  bits.push({
+    none: `Reported empty ${when ? ago(when) : ''}`,
+    req:  `Filed ${when ? ago(when) : ''}`,
+    tree: `Tree confirmed ${when ? ago(when) : ''}`,
+    wait: `Left to the city's queue ${when ? ago(when) : ''}`
+  }[st].trim());
+  if (m.by) bits.push(esc(m.by));
+  if (st === 'req' && m.sr) bits.push(`<b>${esc(m.sr)}</b>`);
+  // the city's own record, but only where it adds something
+  if (s.plantedAt){
+    bits.push(st === 'req' && m.sr
+      ? 'confirmed by the city'
+      : `the city has a request${s.plantSr ? ' ' + esc(s.plantSr) : ''} from ${longDate(s.plantedAt)}`);
+  }
+  if (st === 'none') bits.push('task waiting under <b>Tasks</b>');
+  if (st === 'wait' && !nearbyRequests(s).length)
+    bits.push('that request has closed — worth another look');
+  return `<p class="statusline ${st}">${bits.join(' · ')}</p>`;
 }
 
 function factsList(s){
@@ -1753,8 +1789,8 @@ function factsList(s){
       <dl class="facts">
         <div class="fact"><dt>Removal request</dt><dd>${esc(s.id)}</dd></div>
         <div class="fact"><dt>Removal closed</dt><dd>${longDate(s.closed)} · ${ago(s.closed)}</dd></div>
-        ${st === 'req' ? `<div class="fact"><dt>Planting request</dt><dd>${
-          m && m.sr ? esc(m.sr) : '<span class="nosr">not recorded</span>'}</dd></div>` : ''}
+        ${st === 'req' && !(m && m.sr) ? `<div class="fact"><dt>Planting request</dt>
+          <dd><span class="nosr">not recorded</span></dd></div>` : ''}
         ${st === 'none' && when ? `<div class="fact"><dt>Gap confirmed</dt><dd>${longDate(when)}${
           m && m.by ? ' · '+esc(m.by) : ''}</dd></div>` : ''}
         <div class="fact"><dt>ZIP</dt><dd>${esc(s.zip)}</dd></div>
@@ -1931,19 +1967,18 @@ function renderSheet(){
       <p class="pkind">${label ? `<span class="pill ${cls}">${label}</span>` : 'Not checked yet'}</p>
       <h3>${esc(s.address)}</h3>
       <p class="pmeta">Removal closed ${ago(s.closed)}${
-        me ? ` · ${dist(miles(me, s))} from you` : ''}${
-        st === 'req' && m.sr ? ` · ${esc(m.sr)}` : ''}</p>
+        me ? ` · ${dist(miles(me, s))} from you` : ''}</p>
     </div>
     <div class="sheetbody">
       <div class="peekpart">
-        ${near.length ? `<button class="nearline" data-shownear="${esc(s.id)}">
-            ${near.length === 1 ? 'A planting request' : near.length + ' planting requests'}
-            already open — nearest ${dist(near[0].ft / FT_PER_MI)} away, shown on the map</button>` : ''}
+        ${statusLine(s)}
+        ${near.length && (st === 'open' || st === 'none') ? `<button class="nearline" data-shownear="${esc(s.id)}">
+            ${near.length === 1 ? 'A planting request is' : near.length + ' planting requests are'}
+            already open nearby — nearest ${dist(near[0].ft / FT_PER_MI)}, shown on the map</button>` : ''}
         ${decision}
       </div>
       <div class="restpart">
-        ${banners(s)}
-        ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
+        ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s, true) : ''}
         ${factsList(s)}
         ${noteBlock(s.id)}
         ${quietRow(s)}
@@ -2300,7 +2335,7 @@ function renderDetail(){
         </svg>Ask someone</button>
     </div>
 
-    ${banners(s)}
+    ${statusLine(s)}
     ${(st === 'open' || st === 'none') && choosing !== s.id ? dupWarning(s) : ''}
     <div class="mapbox">
       <div id="minimap"></div>
