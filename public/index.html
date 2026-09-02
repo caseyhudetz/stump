@@ -570,6 +570,15 @@ button.dupshow .dshow{margin:.45rem 0 0;color:#8A5310;font-weight:600}
   font-size:1.35rem;line-height:1.1;margin:.1rem 0 .3rem;overflow-wrap:break-word;
 }
 .sheet .sdist{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);line-height:1.7}
+/* the way past a "no" the record cannot actually be sure of */
+.override{
+  margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--line);
+}
+.override p{
+  margin:0 0 .6rem;font-family:'IBM Plex Mono',monospace;
+  font-size:.66rem;line-height:1.65;color:var(--dim);
+}
+.override p b{color:var(--ink);font-weight:600}
 .spotform{margin-top:1rem}
 .spotform .srinput{width:100%;margin:.35rem 0 0}
 .spotform .btnrow{margin-top:.7rem}
@@ -815,10 +824,12 @@ button.dupshow .dshow{margin:.45rem 0 0;color:#8A5310;font-weight:600}
          control, rather than a slab pushing the map down the page -->
     <div class="sheetwrap" id="sortwrap" hidden>
       <div class="sheet panel" id="sortpanel">
-        <div class="grip"></div>
-        <button class="sclose" id="sortclose" aria-label="Close">×</button>
-        <h3 class="ptitle">Show on map</h3>
-        <p class="count" id="count"></p>
+        <div class="dragzone">
+          <div class="grip"></div>
+          <button class="sclose" id="sortclose" aria-label="Close">×</button>
+          <h3 class="ptitle">Show on map</h3>
+          <p class="count" id="count"></p>
+        </div>
 
         <input class="search" id="q" type="search" placeholder="Search address…" autocomplete="off">
         <p class="plabel">View</p>
@@ -1937,6 +1948,55 @@ function armSheet(){
   el.addEventListener('pointercancel', release);
 }
 
+/* The filter and the photo sheet come up the same way the card does, so they
+   have to go away the same way. They have no half-open stop — there is only
+   down — but the grab area, the threshold and the feel are the card's. */
+const DISMISS_PX = 70;
+function armPanels(){
+  let sheet = null, wrap = null, y0 = 0, dy = 0, moved = false;
+
+  const close = () => {
+    if (!wrap) return;
+    if (wrap.id === 'sortwrap') closeSort();
+    else if (wrap.id === 'photosheet') closeShot();
+  };
+
+  document.addEventListener('pointerdown', e => {
+    const zone = e.target.closest('.sheetwrap .dragzone');
+    if (!zone || e.target.closest('button')) return;
+    sheet = zone.closest('.sheet');
+    wrap = zone.closest('.sheetwrap');
+    if (!sheet || !wrap) return;
+    y0 = e.clientY; dy = 0; moved = false;
+    sheet.style.transition = 'none';
+    // as on the card: capture up front, or a fast drag leaves the element
+    try{ zone.setPointerCapture(e.pointerId); }catch(err){}
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!sheet) return;
+    dy = e.clientY - y0;
+    if (!moved){
+      if (Math.abs(dy) < 6) return;    // still short enough to be a tap
+      moved = true;
+    }
+    // it follows your finger down, and resists being pulled up
+    sheet.style.transform = `translateY(${dy < 0 ? dy * 0.25 : dy}px)`;
+  });
+
+  const release = () => {
+    if (!sheet) return;
+    const el = sheet, gone = moved && dy > DISMISS_PX;
+    sheet = null;
+    el.style.transition = '';
+    el.style.transform = '';
+    if (gone) close();
+    wrap = null;
+  };
+  document.addEventListener('pointerup', release);
+  document.addEventListener('pointercancel', release);
+}
+
 /* Peek or full as a class, so the CSS transition does the settling. */
 function setSheetFull(full){
   const el = $('#pitsheet');
@@ -1998,10 +2058,17 @@ function renderSheet(){
         <h3>${esc(p.address)}</h3>
         <p class="pmeta">Requested ${ago(p.at)} · ${esc(p.id)}</p>
       </div>
-      <p class="pbody">The city has been asked for a tree here and hasn't
-        planted it yet. Nothing to report — it is already in the queue.</p>`;
+      <div class="sheetbody">
+        <div class="peekpart">
+          <p class="pbody">The city has been asked for a tree here and hasn't
+            planted it yet. Nothing to report — it is already in the queue.</p>
+          ${anotherPit(null, p)}
+        </div>
+      </div>`;
     el.hidden = false;
-    requestAnimationFrame(() => el.classList.add('up'));
+    /* Measured like the site card, so the whole of it is inside the peek and
+       nothing sits below a fold you cannot reach. */
+    requestAnimationFrame(() => { measurePeek(); el.classList.add('up'); paintCardState(); });
     return;
   }
 
@@ -2022,7 +2089,8 @@ function renderSheet(){
          ${st === 'none' ? `<button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>` : ''}
          ${st === 'wait' ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>` : ''}
          <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
-       </div>`;
+       </div>
+       ${anotherPit(s)}`;
 
   /* The whole site is in the card from the start and the peek height just
      clips it, so pulling the card up reveals the rest as it travels rather
@@ -2331,8 +2399,8 @@ function spotForm(){
 
 /* One task for a place the city has no record of. The photo goes with it,
    on this device, so the right picture is to hand when you file. */
-async function makeSpotTask(addr, zip){
-  const at = shot ? shot.at : null;
+async function makeSpotTask(addr, zip, note, where){
+  const at = where || (shot ? shot.at : null);
   const file = shot ? shot.file : null;
   if (!at) return;
   const id = 'spot:' + Date.now().toString(36);
@@ -2341,10 +2409,12 @@ async function makeSpotTask(addr, zip){
     site: { address: addr, sortKey: addr.toUpperCase(), zip: zip || '',
             lat: at.lat, lng: at.lng, closed: '' }
   };
+  if (note) marks[id].note = note.slice(0, 200);
   if (reporter) marks[id].by = reporter;
   SITES = SITES.concat([{ id, num:0, street:'', archived:true, ...marks[id].site }]);
   await putPhoto(id, file);
   closeShot();
+  unpick();          // it may have been raised from a card on the map
   await saveMarks();
   tab = 'tasks'; detailId = null;
   repaint();
@@ -2445,18 +2515,35 @@ function renderShot(){
        ${candidates(inRange)}`;
 
   el.innerHTML = `<div class="sheet">
-    <div class="grip"></div>
-    <button class="sclose" id="shotclose">Close</button>
-    <div class="shead">
-      <img class="shot" src="${shot.url}" alt="">
-      <p class="sfrom">${shot.from === 'photo'
-        ? 'Located from the photo itself'
-        : 'No location in the photo — using where you are now'}<br>
-        <span class="acc">accurate to about ${Math.round(err)} ft</span></p>
+    <div class="dragzone">
+      <div class="grip"></div>
+      <button class="sclose" id="shotclose">Close</button>
+      <div class="shead">
+        <img class="shot" src="${shot.url}" alt="">
+        <p class="sfrom">${shot.from === 'photo'
+          ? 'Located from the photo itself'
+          : 'No location in the photo — using where you are now'}<br>
+          <span class="acc">accurate to about ${Math.round(err)} ft</span></p>
+      </div>
     </div>
     ${body}
   </div>`;
   el.hidden = false;
+}
+
+/* The record answers for one pit. A parkway can hold two, and the app has no
+   way to know it — the city's row is a single address. So wherever the
+   answer is "nothing to do here", say what that assumes, and let the person
+   standing in front of the second pit overrule it. */
+function anotherPit(s, plant){
+  const key = plant ? 'plant:' + plant.id : s.id;
+  return `<div class="override">
+    <p>Is there a <b>second empty pit</b> here that this doesn't cover?
+      The record only knows about one.</p>
+    ${locating
+      ? `<button class="mini ghost" disabled>Finding the address…</button>`
+      : `<button class="mini ghost" data-another="${esc(key)}">Ask for a tree for it anyway</button>`}
+  </div>`;
 }
 
 function verdictFor(hit, rest){
@@ -2472,10 +2559,12 @@ function verdictFor(hit, rest){
     ? `<div class="btnrow">
          <button class="mini fill" data-goto-task="${esc(s.id)}">Go to the task</button>
          <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
-       </div>`
+       </div>
+       ${anotherPit(s)}`
     : `<div class="btnrow">
          <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
-       </div>`;
+       </div>
+       ${anotherPit(s)}`;
   return `<h3>${esc(s.address)}</h3>
     <p class="sdist">${dist(hit.ft / FT_PER_MI)} from the photo · removal ${esc(s.id)}
       closed ${ago(s.closed)}</p>
@@ -2599,7 +2688,8 @@ function renderDetail(){
         ${st === 'req'  ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Reopen task</button>` : ''}
         ${st === 'wait' ? `<button class="mini ghost" data-mark="${esc(s.id)}::none">Ask again anyway</button>` : ''}
         <button class="mini ghost" data-mark="${esc(s.id)}::open">Undo report</button>
-      </div>`;
+      </div>
+      ${anotherPit(s)}`;
 
   killMini();   // before the container it lives in is thrown away
 
@@ -2925,6 +3015,38 @@ document.addEventListener('click', async e => {
     return;
   }
   if (e.target.closest('#spotcancel')){ spotting = false; renderShot(); return; }
+
+  /* Overruling the record: a second pit at a place the city has one row for.
+     It becomes its own task rather than touching the existing one, and it
+     carries a note saying why it is not the duplicate it will look like. */
+  const another = e.target.closest('[data-another]');
+  if (another){
+    if (locating) return;
+    const key = another.dataset.another;
+    // it can be raised from a photo, or from a planting-request pin
+    const plant = key.startsWith('plant:')
+      ? PLANTS.find(x => 'plant:' + x.id === key) : null;
+    const s = plant ? null : byId(key);
+    if (!plant && !s) return;
+    const at = shot ? shot.at : (plant ? { lat:plant.lat, lng:plant.lng }
+                                       : { lat:s.lat, lng:s.lng });
+    const covered = plant ? [plant.id]
+      : [ marks[s.id] && marks[s.id].sr, ...nearbyRequests(s).map(({p}) => p.id) ].filter(Boolean);
+    const note = 'A separate empty pit at this address' +
+      (covered.length ? `, not the one covered by ${covered.slice(0,2).join(' / ')}` : '') +
+      '. Both pits are on the same parkway.';
+    locating = true; if (shot) renderShot(); else renderSheet();
+    const found = await reverseAddress(at);
+    locating = false;
+    // fall back to the address the record already gives this spot: the right
+    // street and number even when the geocoder cannot answer
+    const known = plant ? plant.address : s.address;
+    const addr = found ? found.address : known;
+    const zip  = found ? found.zip : (s ? s.zip : '');
+    if (!addr){ toast('Could not name that spot.'); return; }
+    await makeSpotTask(addr, zip, note, at);
+    return;
+  }
 
   const shotAdd = e.target.closest('[data-addshot]');
   if (shotAdd){
@@ -3303,6 +3425,7 @@ function fallbackCopy(text, done){
   if (Object.keys(marks).length) await pushMarks();
   watchForRemoteEdits();
   armSheet();
+  armPanels();
 
   try{
     const { sites, confirmed, plants, stats } = await loadSites();
