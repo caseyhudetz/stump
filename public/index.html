@@ -570,6 +570,34 @@ button.dupshow .dshow{margin:.45rem 0 0;color:#8A5310;font-weight:600}
   font-size:1.35rem;line-height:1.1;margin:.1rem 0 .3rem;overflow-wrap:break-word;
 }
 .sheet .sdist{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--dim);line-height:1.7}
+/* ---------- the trail ----------
+   A rail with a dot per step. Done steps are filled, what is still owed is
+   hollow and dimmed, and the city's own steps are marked so it is never
+   unclear which half of the record you are reading. */
+.trail{
+  list-style:none;margin:.9rem 0 0;padding:0 0 0 1.15rem;
+  border-left:2px solid var(--line);
+}
+.trail .tstep{position:relative;padding:0 0 .95rem}
+.trail .tstep:last-child{padding-bottom:0}
+.trail .tstep::before{
+  content:'';position:absolute;left:-1.55rem;top:.18rem;
+  width:.62rem;height:.62rem;border-radius:50%;
+  background:var(--ink);box-shadow:0 0 0 3px var(--paper);
+}
+.trail .tstep.city::before{background:var(--dim)}
+.trail .tstep.pending::before{background:var(--paper);border:2px solid var(--line);
+  width:.5rem;height:.5rem}
+.trail .twhat{display:block;font-size:.8rem;line-height:1.35;color:var(--ink)}
+.trail .tstep.pending .twhat{color:var(--dim)}
+.trail .twhen{
+  display:block;margin-top:.1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;line-height:1.5;color:var(--dim);
+}
+.trailhead{
+  margin:1rem 0 0;font-family:'IBM Plex Mono',monospace;font-size:.6rem;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--dim);
+}
 /* the way past a "no" the record cannot actually be sure of */
 .override{
   margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--line);
@@ -995,6 +1023,34 @@ function paintSync(){
     : 'Your reports sync across your devices.';
 }
 
+/* The mark carries one timestamp, and each answer overwrites it — which is
+   fine for "what is true here" and useless for "what happened here". The log
+   is the second question: an entry per answer, appended and never rewritten,
+   so a filed request can show the day the pit was found empty as well as the
+   day it was asked for. Capped, because a record that grows without limit
+   would eventually be the largest thing in the sync. */
+const LOG_MAX = 24;
+function logEvent(id, state, extra){
+  const m = marks[id];
+  if (!m) return;
+  const log = Array.isArray(m.log) ? m.log.slice() : [];
+  const last = log[log.length - 1];
+  // re-answering the same way is not a new event, it is the same one
+  if (last && last.s === state && !extra) return;
+  log.push({ s: state, at: m.at || new Date().toISOString(), ...(extra || {}) });
+  m.log = log.slice(-LOG_MAX);
+}
+
+/* Reports made before there was a log still have the one thing that was
+   always kept: the answer, and when it was given. */
+function backfillLogs(){
+  for (const id of Object.keys(marks)){
+    const m = marks[id];
+    if (!m || Array.isArray(m.log) || !m.state || m.state === 'open') continue;
+    m.log = [{ s: m.state, at: m.at, ...(m.sr ? { sr: m.sr } : {}) }];
+  }
+}
+
 async function saveMarks(){
   // Every report carries enough of its site to be rebuilt without the city.
   // Done here rather than at each call site so no future write can forget it.
@@ -1144,7 +1200,11 @@ async function loadSites(){
          This used to be a `continue`, which is why filing a request deleted
          the record of having filed it. Keep the site and the city's proof. */
       confirmed[site.id] = { ...site,
-        plantedAt: asked[0].created_date, plantSr: asked[0].sr_number };
+        plantedAt: asked[0].created_date, plantSr: asked[0].sr_number,
+        // how far the city has taken it: the trail reads its own progress
+        // off these rather than assuming that filing was the end of it
+        plantStatus: asked[0].status || '',
+        plantClosed: asked[0].closed_date || '' };
       continue;
     }
     sites.push(site);
@@ -2411,6 +2471,7 @@ async function makeSpotTask(addr, zip, note, where){
   };
   if (note) marks[id].note = note.slice(0, 200);
   if (reporter) marks[id].by = reporter;
+  logEvent(id, 'none');
   SITES = SITES.concat([{ id, num:0, street:'', archived:true, ...marks[id].site }]);
   await putPhoto(id, file);
   closeShot();
@@ -2647,6 +2708,72 @@ function addrBlock(s){
     <button class="linkish" data-addr="${esc(s.id)}">Fix it</button></p>`;
 }
 
+/* ---------- what happened here, in order ----------
+
+   Three sources, and the trail is careful about which is which. The city's
+   own rows are facts it published: the removal it closed, the request it
+   recorded, the day it marked that request done. Your log is what you did.
+   And the last step is neither — it is the thing still owed, drawn hollow,
+   with the ward's own median as the only estimate anyone can honestly give.
+
+   Nothing here is inferred from a step being reached. If the city has not
+   published the request yet, that step stays open, even though you filed
+   it — because "filed" is your record and "recorded" is theirs. */
+const TRAIL_SAID = {
+  none: 'Found the pit empty',
+  tree: 'Found a tree already here',
+  wait: "Left to the city's queue",
+  req:  'Filed the planting request',
+  open: 'Report withdrawn'
+};
+
+function trailSteps(s){
+  const m = marks[s.id] || {};
+  const out = [];
+
+  if (s.closed) out.push({ who:'city', at:s.closed,
+    what:'City removed the tree', detail: String(s.id).startsWith('spot:') ? '' : s.id });
+
+  for (const e of (m.log || [])){
+    if (!TRAIL_SAID[e.s]) continue;
+    out.push({ who:'you', at:e.at, what:TRAIL_SAID[e.s],
+      detail: e.sr ? e.sr : '' });
+  }
+
+  // the city's acknowledgement, which is not the same as your having filed
+  if (s.plantedAt) out.push({ who:'city', at:s.plantedAt,
+    what:'City recorded the request', detail: s.plantSr || '' });
+
+  const done = s.plantClosed && /^completed/i.test(s.plantStatus || '');
+  if (done) out.push({ who:'city', at:s.plantClosed, what:'City closed the request',
+    detail: s.plantStatus });
+
+  out.sort((a,b) => String(a.at).localeCompare(String(b.at)));
+
+  // what is still owed, if anything
+  const st = stateOf(s);
+  if (!done && (st === 'req' || st === 'wait')){
+    if (!s.plantedAt) out.push({ pending:true, who:'city', what:'City records the request',
+      detail:'usually within a few days of filing' });
+    const med = PLANT_STATS.median;
+    out.push({ pending:true, who:'city', what:'Tree planted',
+      detail: med ? `this ward usually takes about ${humanDays(med)}` : '' });
+  }
+  return out;
+}
+
+function trail(s){
+  const steps = trailSteps(s);
+  if (steps.length < 2) return '';       // one event is a date, not a trail
+  return `<ol class="trail">${steps.map(e => `
+    <li class="tstep${e.pending ? ' pending' : ''}${e.who === 'city' ? ' city' : ''}">
+      <span class="twhat">${esc(e.what)}</span>
+      <span class="twhen">${e.pending ? 'not yet'
+        : longDate(e.at) + ' · ' + ago(e.at)}${
+        e.detail ? ' · ' + esc(e.detail) : ''}</span>
+    </li>`).join('')}</ol>`;
+}
+
 function noteBlock(id){
   const saved = (marks[id] && marks[id].note) || '';
   if (noting === id){
@@ -2708,6 +2835,7 @@ function renderDetail(){
 
     ${factsList(s)}
     ${noteBlock(s.id)}
+    ${trail(s) ? `<p class="trailhead">What has happened here</p>${trail(s)}` : ''}
     ${quietRow(s)}
   `;
 
@@ -2855,6 +2983,7 @@ function renderTasks(){
      One line each, opened only when you want the detail. */
   const doneRow = s => {
     const m = marks[s.id] || {};
+    const tr = trail(s);
     return `<details class="donerow"${doneOpen.has(s.id) ? ' open' : ''} data-done="${esc(s.id)}">
       <summary>
         <span class="drmain">
@@ -2864,11 +2993,12 @@ function renderTasks(){
         <span class="drchev">›</span>
       </summary>
       <div class="drbody">
-        <p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
-          : 'No removal on record'}${m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>
-        ${cityLine(s)}
+        ${tr ? (m.by ? `<p class="tm">Reported by <b>${esc(m.by)}</b></p>` : '')
+          : `<p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
+              : 'No removal on record'}${m.by ? ` · reported by <b>${esc(m.by)}</b>` : ''}</p>`}
         ${shotBlock(s.id)}
         ${noteBlock(s.id)}
+        ${tr ? `<p class="trailhead">What has happened here</p>${tr}` : ''}
         <div class="btnrow">
           <button class="mini ghost" data-file="${esc(s.id)}">${m.sr ? 'Edit number' : 'Add number'}</button>
           <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
@@ -2885,6 +3015,7 @@ function renderTasks(){
   const seenRow = s => {
     const m = marks[s.id] || {};
     const st = stateOf(s);
+    const tr = trail(s);
     return `<details class="donerow"${doneOpen.has(s.id) ? ' open' : ''} data-done="${esc(s.id)}">
       <summary>
         <span class="drmain">
@@ -2895,10 +3026,12 @@ function renderTasks(){
         <span class="drchev">›</span>
       </summary>
       <div class="drbody">
-        <p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
-          : 'No removal on record'}</p>
+        ${tr ? '' : `<p class="tm">${s.closed ? `Removal ${esc(s.id)} closed ${longDate(s.closed)}`
+          : 'No removal on record'}</p>`}
         ${cityLine(s)}
+        ${shotBlock(s.id)}
         ${noteBlock(s.id)}
+        ${tr ? `<p class="trailhead">What has happened here</p>${tr}` : ''}
         <div class="btnrow">
           <button class="mini ghost" data-open="${esc(s.id)}">Open the site</button>
           <button class="mini ghost" data-mark="${esc(s.id)}::open">Check it again</button>
@@ -3184,7 +3317,9 @@ document.addEventListener('click', async e => {
     if (prev.note) marks[id].note = prev.note;
     // the 311 number belongs to a filing; undoing or finding a tree ends it
     if (prev.sr && (st === 'req' || st === 'none')) marks[id].sr = prev.sr;
+    if (prev.log) marks[id].log = prev.log;
     if (reporter) marks[id].by = reporter;
+    logEvent(id, st);
     lastUndo = null;
     await saveMarks();
     // reporting "no tree" is the moment a task is born — take them to it
@@ -3214,6 +3349,7 @@ document.addEventListener('click', async e => {
     if (stateOf(byId(id)) !== 'req'){
       marks[id] = { ...(marks[id]||{}), state:'req', at:new Date().toISOString() };
       if (reporter) marks[id].by = reporter;
+      logEvent(id, 'req');
       await saveMarks();
     }
     repaint(); return;
@@ -3226,9 +3362,12 @@ document.addEventListener('click', async e => {
     // the report is going; the picture of it has nothing left to belong to
     forgetPhoto(id);
     const note = marks[id] && marks[id].note;
+    const hist = marks[id] && marks[id].log;
     marks[id] = { state:'open', at:new Date().toISOString() };
+    if (hist) marks[id].log = hist;
     if (note) marks[id].note = note;   // what you saw there is still true
     if (reporter) marks[id].by = reporter;
+    logEvent(id, 'open');
     await saveMarks();
     repaint();
     return;
@@ -3325,9 +3464,12 @@ document.addEventListener('submit', async e => {
   e.preventDefault();
   const id = form.dataset.srfor;
   const sr = (new FormData(form).get('sr') || '').toString().trim().slice(0,40);
+  const had = (marks[id] || {}).sr;
   marks[id] = { ...(marks[id]||{}), state:'req', at:new Date().toISOString() };
   if (sr) marks[id].sr = sr; else delete marks[id].sr;
   if (reporter) marks[id].by = reporter;
+  // a number arriving later is its own event; correcting one is not
+  logEvent(id, 'req', sr && sr !== had ? { sr } : null);
   filing = null;
   await saveMarks();
   repaint();
@@ -3422,6 +3564,7 @@ function fallbackCopy(text, done){
   await loadPhotoKeys();
 
   await pullMarks({ quiet:true });
+  backfillLogs();
   if (Object.keys(marks).length) await pushMarks();
   watchForRemoteEdits();
   armSheet();
