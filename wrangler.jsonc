@@ -11,6 +11,22 @@
     "binding": "ASSETS"
   },
 
+  // Once a day, ask the city what changed and mail anything new. 13:00 UTC
+  // is 8am Chicago in summer, 7am in winter — cron is UTC and does not
+  // follow the clocks. The city publishes overnight, so morning is right.
+  "triggers": {
+    "crons": ["0 13 * * *"]
+  },
+
+  // Where the links in that mail point. Set to the real hostname.
+  "vars": {
+    "PUBLIC_ORIGIN": "https://stump.caseyhudetz.workers.dev"
+  },
+
+  // NOTIFY_TO and RESEND_API_KEY are secrets, not vars — see test/README
+  // and CLAUDE.md. Without them the watch runs and simply has nowhere to
+  // send, which is a supported state, not a failure.
+
   // Shared storage for reports. One key holds every mark, merged per site
   // by timestamp, so several people can survey at once without overwriting
   // each other. Without this binding /api/marks answers 503 and the app

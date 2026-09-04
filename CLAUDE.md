@@ -10,14 +10,26 @@ iPhone, possibly moving.
 
 ## Layout
 
-    public/index.html   the whole app — HTML, CSS and JS in one file, no build
-    src/worker.js       Cloudflare Worker: /api/marks, else serve public/
-    wrangler.jsonc      Worker name and the KV binding
+    public/index.html   the app — HTML, CSS and JS in one file, no build
+    public/match.js     the matching rules, shared by the page and the Worker
+    src/worker.js       Worker: /api/marks, /api/watch, the nightly cron
+    wrangler.jsonc      Worker name, KV binding, cron trigger
     test/               see "Tests" below
 
-`public/index.html` is ~3,600 lines and deliberately single-file: it is
-served as a static asset, has no build step, and can be read end to end.
-Keep it that way unless there is a reason not to.
+`public/index.html` is ~3,600 lines and deliberately single-file: served as
+a static asset, no build step, readable end to end. Keep it that way.
+
+`public/match.js` is the one exception, and it earns it: which removals count
+as empty pits and what counts as a request already covering one are needed by
+the page *and* by the nightly watch, and two copies of a rule that fiddly
+drift. It is loaded twice — as a classic `<script>` before the page's own
+script (so its functions are globals in time), and imported by the Worker at
+bundle time. Hence the guarded `module.exports` at the bottom rather than an
+`export` statement: `export` would break the script tag.
+
+**Verify a bundle before pushing**: `node_modules/.bin/wrangler deploy
+--dry-run`. Wrangler is a devDependency now, so a broken import is caught
+here rather than by a failed deploy.
 
 ## Deploying
 
@@ -34,23 +46,53 @@ supported mode, not a broken one.
 
     sh test/run.sh                 all of them (takes ~15 min)
     sh test/run.sh trail swipe     just those
+    sh test/run.sh watch wlog      the Worker's own logic, seconds, no browser
 
 First run fetches the map libraries from npm into `test/vendor/`
 (gitignored). The runner starts its own static server on `$PORT` (8150).
 
-18 suites. Each drives a real Chromium against the real page, stubs the
-city's API and the map libraries, and **prints what it found rather than
-asserting silently** — the output is meant to be read, and a suite ends with
-`page errors: none` when it passed. `wlog` is a plain Node unit test of the
-Worker's merge logic. `chk` is a one-second syntax check; run it after every
-edit before anything slower.
+19 suites. Most drive a real Chromium against the real page, stub the city's
+API and the map libraries, and **print what they found rather than asserting
+silently** — the output is meant to be read, and a suite ends with `page
+errors: none` when it passed. `wlog` and `watch` are plain Node tests of the
+Worker (merge logic, and the nightly watch with the city and Resend stubbed);
+they need no browser and run in seconds. `chk` is a one-second syntax check;
+run it after every edit before anything slower.
 
 Suites are named for what they cover: `trail` (the audit trail), `swipe`
 (sheet dismissal, the override), `link` (the third answer, photos), `spot`
 (one-tap tasks, geocoding), `photo`/`across` (EXIF matching), `dup`
 (duplicate detection), `keep` (reports surviving the city's data), `card`/
 `sheet`/`vec` (the bottom card and the map), `queue`, `four`, `pop`, `tidy`,
-`trim`, `third`.
+`trim`, `third`, and `watch` for the nightly alert.
+
+## The nightly watch
+
+A cron trigger (`0 13 * * *`, i.e. UTC — 8am Chicago in summer) runs
+`scheduled` in the Worker. It asks the city what changed, finds empty pits
+with no planting request nearby, drops any you have already answered in the
+app, and emails the ones it has not mentioned before. State is a KV key,
+`watched:v1`.
+
+The first run **seeds that state and sends one confirmation line instead of
+the whole backlog** — the backlog is not news, it is the app. It also
+confirms the wiring, which is the one part that cannot be tested from a
+sandbox that can reach neither the city nor a mail provider.
+
+`GET /api/watch` is a dry run: it reports what it would send and writes
+nothing, so it can be opened any time without silencing tomorrow's alert.
+
+Delivery is Resend. Two things must be set on the Worker, and neither belongs
+in the repo:
+
+    wrangler secret put RESEND_API_KEY
+    wrangler secret put NOTIFY_TO         # the address to mail
+
+`NOTIFY_FROM` defaults to `onboarding@resend.dev`, which Resend will send
+from without you owning a domain, but only to a **verified** address — so
+`NOTIFY_TO` has to be the one confirmed on the Resend account. With either
+secret missing the watch still runs and simply has nowhere to send; that is
+a supported state, logged, not a failure.
 
 ## The environment this runs in
 
