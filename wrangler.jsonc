@@ -20,7 +20,7 @@
 
   // Where the links in that mail point. Set to the real hostname.
   "vars": {
-    "PUBLIC_ORIGIN": "https://stump.caseyhudetz.workers.dev"
+    "PUBLIC_ORIGIN": "https://stump.caseymhudetz.workers.dev"
   },
 
   // NOTIFY_TO and RESEND_API_KEY are secrets, not vars — see test/README
