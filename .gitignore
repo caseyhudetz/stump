@@ -1,4 +1,5 @@
 node_modules/
+src/.probe.*
 .wrangler/
 .dev.vars
 .DS_Store

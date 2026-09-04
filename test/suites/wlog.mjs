@@ -1,19 +1,21 @@
 /* The worker's half of the trail: it has to survive the round trip, refuse
    junk, and merge rather than choose when two phones both hold a piece. */
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
 
 /* The worker keeps its helpers private, which is right for a worker and
    inconvenient for a test. Rather than export them just to be tested, the
    source is re-emitted with an export line appended and imported from
-   there — so what runs here is byte-for-byte what ships. */
+   there — so what runs here is byte-for-byte what ships. The copy has to
+   live in src/, because the worker imports ../public/match.js by relative
+   path and a temp directory would not resolve it. */
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const probe = join(mkdtempSync(join(tmpdir(), 'stump-')), 'worker.mjs');
+const probe = join(root, 'src', '.probe.wlog.mjs');
 writeFileSync(probe, readFileSync(join(root, 'src/worker.js'), 'utf8') +
   '\nexport { clean, merge, cleanLog };\n');
-const { clean, merge, cleanLog } = await import(probe);
+const { clean, merge, cleanLog } = await import(probe + '?v=' + Date.now());
+process.on('exit', () => { try { unlinkSync(probe); } catch {} });
 
 const now = Date.now();
 const t = n => new Date(now - n * 86400000).toISOString();

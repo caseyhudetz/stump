@@ -1,6 +1,6 @@
 # Tests
 
-    sh test/run.sh                 all 18 (roughly 15 minutes)
+    sh test/run.sh                 all 19 (roughly 15 minutes)
     sh test/run.sh trail swipe     just those
     node test/chk.js               syntax only, one second
 
@@ -27,9 +27,18 @@ looking wrong rather than by an assertion firing.
 
 Screenshots land in `test/vendor/` alongside the libraries, gitignored.
 
-`wlog.mjs` is different: a plain Node test of the Worker's `clean` and
-`merge`, no browser. It re-emits `src/worker.js` with an export line appended
-and imports that, so what it tests is byte-for-byte what ships.
+`wlog.mjs` and `watch.mjs` are different: plain Node tests of the Worker, no
+browser, a couple of seconds each. `wlog` covers `clean` and `merge`; `watch`
+drives the nightly alert with the city's API and Resend stubbed, and prints
+the email it would have sent so the wording can be read rather than guessed
+at. Both import a copy of `src/worker.js` written into `src/` — it has to be
+there, because the Worker imports `../public/match.js` by relative path and a
+temp directory would not resolve it. The copies are gitignored and deleted on
+exit.
+
+`node_modules/.bin/wrangler deploy --dry-run` is the other cheap check: it
+bundles the Worker exactly as a deploy would, so a broken import or a
+mistyped config key fails here instead of in production.
 
 ## Adding one
 
