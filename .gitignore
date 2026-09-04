@@ -2,3 +2,6 @@ node_modules/
 .wrangler/
 .dev.vars
 .DS_Store
+# vendored map libraries and the screenshots the suites leave behind;
+# test/vendor.sh refetches the libraries from npm
+test/vendor/
