@@ -360,7 +360,7 @@ export default {
   async scheduled(event, env, ctx) {
     // the Worker's own hostname is not in scope here, so the links in the
     // mail need it configured; the workers.dev URL is a fine default
-    const origin = env.PUBLIC_ORIGIN || 'https://stump.caseyhudetz.workers.dev';
+    const origin = env.PUBLIC_ORIGIN || 'https://stump.caseymhudetz.workers.dev';
     ctx.waitUntil(runWatch(env, origin).then(
       r => console.log('watch:', JSON.stringify(r)),
       e => console.log('watch failed:', e && e.message)
