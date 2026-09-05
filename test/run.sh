@@ -42,7 +42,7 @@ sleep 1
 
 suites="$*"
 if [ -z "$suites" ]; then
-  suites="chk trail swipe link spot third tidy trim card queue sheet dup keep across four photo pop vec wlog watch"
+  suites="chk trail swipe link spot third tidy trim card queue sheet dup keep across four photo pop vec wlog watch lives"
   suites=$(echo "$suites" | sed 's/chk //')
 fi
 
@@ -53,7 +53,7 @@ for s in $suites; do
   [ -f "$f" ] || f="$here/suites/$s.mjs"
   if [ ! -f "$f" ]; then echo "FAIL  $s  (no such suite)"; fail=1; continue; fi
   out=$(node "$f" 2>&1) || { printf 'FAIL  %-8s\n' "$s"; echo "$out" | tail -12; fail=1; continue; }
-  if echo "$out" | grep -q "page errors *: *none" || [ "$s" = wlog ] || [ "$s" = watch ]; then
+  if echo "$out" | grep -q "page errors *: *none" || [ "$s" = wlog ] || [ "$s" = watch ] || [ "$s" = lives ]; then
     printf 'ok    %-8s\n' "$s"
   else
     printf 'ERRS  %-8s\n' "$s"; echo "$out" | tail -12; fail=1
