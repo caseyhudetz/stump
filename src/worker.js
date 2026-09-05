@@ -392,6 +392,46 @@ function mailFor(pits, origin){
 
 const canSend = env => Boolean(env.RESEND_API_KEY && env.NOTIFY_TO);
 
+/* Enough to debug a secret without printing one. When the Worker says it
+   cannot send, the useful questions are: does it see the binding at all,
+   under that exact name, and does the value look like the thing it should
+   be. All three are answerable without revealing anything.
+
+   The binding list is the sharpest of them. If a secret was saved in the
+   dashboard but the running version does not carry it, the name simply
+   will not be here — which distinguishes "Cloudflare did not deploy it"
+   from "the value is wrong", and those have completely different fixes. */
+function mask(v){
+  if (typeof v !== 'string') return v === undefined ? 'missing' : `not a string (${typeof v})`;
+  if (!v) return 'present but empty';
+  const trimmed = v.trim();
+  const note = trimmed.length !== v.length ? ' — HAS SURROUNDING WHITESPACE' : '';
+  if (/@/.test(trimmed))
+    return `${trimmed[0]}…@${trimmed.split('@')[1]} (${trimmed.length} chars)${note}`;
+  return `${trimmed.slice(0, 3)}… (${trimmed.length} chars)${note}`;
+}
+
+const diagnose = env => ({
+  bindingsTheWorkerCanSee: Object.keys(env).sort(),
+  RESEND_API_KEY: mask(env.RESEND_API_KEY),
+  NOTIFY_TO: mask(env.NOTIFY_TO),
+  NOTIFY_FROM: env.NOTIFY_FROM ? mask(env.NOTIFY_FROM) : 'unset (defaults to onboarding@resend.dev)'
+});
+
+/* Sending twice a minute by accident is not a security problem — the only
+   address it can reach is the owner's — but it is rude to Resend and to the
+   inbox, so the two endpoints that actually send are spaced out. KV is
+   eventually consistent, so this is a courtesy, not a gate. */
+const SEND_GAP_MS = 5 * 60 * 1000;
+async function tooSoon(env){
+  if (!env.MARKS) return false;
+  const last = await env.MARKS.get('watch:lastsend');
+  const ago = last ? Date.now() - Date.parse(last) : Infinity;
+  if (Number.isFinite(ago) && ago < SEND_GAP_MS) return Math.ceil((SEND_GAP_MS - ago) / 1000);
+  await env.MARKS.put('watch:lastsend', new Date().toISOString());
+  return false;
+}
+
 /* Resend, because it will send to a verified address without you owning a
    domain. Missing key or address is not an error: the watch simply has
    nowhere to send, says so in the log, and the rest still runs. */
@@ -413,8 +453,12 @@ async function sendMail(env, subject, body){
       text: body
     })
   });
-  if (!res.ok) console.log('watch: send failed', res.status, await res.text());
-  return res.ok;
+  const reply = await res.text();
+  if (!res.ok) console.log('watch: send failed', res.status, reply);
+  // the reply is carried back so the test endpoint can show it: an
+  // unverified address or a bad key fails with a message worth reading,
+  // and swallowing it is how this stayed a mystery for a day
+  return { ok: res.ok, status: res.status, body: reply.slice(0, 400) };
 }
 
 async function runWatch(env, origin){
@@ -460,6 +504,7 @@ async function runWatch(env, origin){
     const { subject, body } = mailFor(fresh, origin);
     sent = await sendMail(env, subject, body);
   }
+  const delivered = sent === true || (sent && sent.ok === true);
 
   // Remember what was mentioned whether or not the mail got through: a
   // send that failed is worth one repeat tomorrow, not a daily rerun of
@@ -468,7 +513,8 @@ async function runWatch(env, origin){
   await env.MARKS.put(SEEN_KEY,
     JSON.stringify({ at: new Date().toISOString(), seeded: true, ids }));
 
-  return { first, watching: pits.length, fresh: fresh.map(s => s.id), sent };
+  return { first, watching: pits.length, fresh: fresh.map(s => s.id),
+           sent: delivered, reply: sent && sent.status ? sent.status : null };
 }
 
 export default {
@@ -496,6 +542,38 @@ export default {
        it would send — it never mails and never writes the seen list, so it
        is safe to open and cannot silence tomorrow's alert. */
     if (pathname === '/api/watch') {
+      const q = new URL(request.url).searchParams;
+
+      /* One email, now, saying nothing but "this works". It touches no
+         state, so it cannot spend the first real run, and it hands back
+         whatever Resend replied — which is the whole point, because a
+         rejected key or an unverified address fails with a reason. */
+      if (q.get('test') === '1') {
+        if (!canSend(env))
+          return json({ sent: false, why: 'not configured', ...diagnose(env) }, 409);
+        const wait = await tooSoon(env);
+        if (wait) return json({ sent: false, why: `wait ${wait}s between sends` }, 429);
+        const r = await sendMail(env, 'Stump · test',
+          'This is the test message from /api/watch?test=1.\n\n' +
+          'If you are reading it, the nightly watch can reach you.\n');
+        return json({ sent: r.ok, resendStatus: r.status, resendSaid: r.body,
+                      ...diagnose(env) }, r.ok ? 200 : 502);
+      }
+
+      /* The cron's own job, on demand, rather than waiting for 8am. This
+         one does write state — it is the real run, not a rehearsal. */
+      if (q.get('run') === '1') {
+        if (!canSend(env))
+          return json({ ran: false, why: 'not configured', ...diagnose(env) }, 409);
+        const wait = await tooSoon(env);
+        if (wait) return json({ ran: false, why: `wait ${wait}s between sends` }, 429);
+        try {
+          return json({ ran: true, ...(await runWatch(env, origin)) });
+        } catch (err) {
+          return json({ ran: false, error: String(err && err.message || err) }, 502);
+        }
+      }
+
       try {
         const { pits } = await pitsWorthAVisit(env);
         const raw = env.MARKS ? await env.MARKS.get(SEEN_KEY) : null;
@@ -513,7 +591,9 @@ export default {
           watching: pits.length,
           alreadyTold: seeded ? known.length : 0,
           wouldSend: fresh.length ? mailFor(fresh, origin) : null,
-          pits: fresh.map(s => ({ id: s.id, address: s.address, closed: s.closed }))
+          pits: fresh.map(s => ({ id: s.id, address: s.address, closed: s.closed })),
+          // add ?test=1 to send one now, or ?run=1 to do the cron's job early
+          diagnostics: diagnose(env)
         });
       } catch (err) {
         return json({ error: String(err && err.message || err) }, 502);

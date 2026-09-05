@@ -82,7 +82,20 @@ confirms the wiring, which is the one part that cannot be tested from a
 sandbox that can reach neither the city nor a mail provider.
 
 `GET /api/watch` is a dry run: it reports what it would send and writes
-nothing, so it can be opened any time without silencing tomorrow's alert.
+nothing, so it can be opened any time without silencing tomorrow's alert. It
+also carries `diagnostics` — the binding names the Worker can actually see,
+plus each secret masked to first characters, length and whether it has stray
+whitespace. That list is the sharp tool: a secret saved in the dashboard but
+absent from the running version simply will not appear in it, which separates
+"Cloudflare did not deploy it" from "the value is wrong".
+
+    ?test=1   sends one throwaway email now and hands back Resend's own
+              status and body, so a rejected key or an unverified address
+              fails with a reason. Touches no state.
+    ?run=1    does the cron's job immediately, state and all.
+
+Both are spaced five minutes apart via a KV timestamp. That is courtesy, not
+security: the only address either can reach is the configured one.
 
 Delivery is Resend. Two things must be set on the Worker, and neither belongs
 in the repo:
