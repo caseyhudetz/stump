@@ -171,6 +171,54 @@ console.log('  subject         :', mails[0] && mails[0].subject);
 console.log('  seeded now      :', JSON.parse(e4c.MARKS._dump()['watched:v1']).seeded,
   '(so it cannot happen twice)');
 
+console.log('\n=== a test send, on demand, without spending the first run ===');
+mails = []; stubFetch();
+const e6 = env(null, null);
+const t1 = await worker.fetch(new Request('https://stump.test/api/watch?test=1'), e6);
+const t1b = await t1.json();
+console.log('  status        :', t1.status, '· sent:', t1b.sent);
+console.log('  subject       :', mails[0] && mails[0].subject);
+console.log('  resend said   :', t1b.resendStatus, t1b.resendSaid);
+console.log('  state untouched:', !e6.MARKS._dump()['watched:v1'],
+  '(so the real first run is still to come)');
+console.log('  and it diagnoses:', JSON.stringify({
+  sees: t1b.bindingsTheWorkerCanSee, key: t1b.RESEND_API_KEY, to: t1b.NOTIFY_TO }));
+
+console.log('\n  a second one straight after is spaced out');
+const t2 = await worker.fetch(new Request('https://stump.test/api/watch?test=1'), e6);
+console.log('  status        :', t2.status, JSON.stringify((await t2.json()).why));
+
+console.log('\n=== unconfigured, it says exactly what is missing ===');
+const e7 = { MARKS: kv({}), NOTIFY_TO: '  you@example.com  ' };
+const t3 = await worker.fetch(new Request('https://stump.test/api/watch?test=1'), e7);
+const t3b = await t3.json();
+console.log('  status        :', t3.status, '·', t3b.why);
+console.log('  key           :', t3b.RESEND_API_KEY);
+console.log('  to            :', t3b.NOTIFY_TO, '<- whitespace is called out');
+console.log('  sees          :', JSON.stringify(t3b.bindingsTheWorkerCanSee));
+
+console.log('\n=== and Resend refusing is reported, not swallowed ===');
+mails = [];
+globalThis.fetch = async (url) => String(url).includes('api.resend.com')
+  ? new Response('{"message":"You can only send testing emails to your own address"}',
+      { status: 403 })
+  : new Response(JSON.stringify(removals), { status: 200 });
+const e8 = env(null, null);
+const t4 = await worker.fetch(new Request('https://stump.test/api/watch?test=1'), e8);
+const t4b = await t4.json();
+console.log('  status        :', t4.status, '· sent:', t4b.sent);
+console.log('  resend said   :', t4b.resendStatus, t4b.resendSaid);
+
+console.log('\n=== the cron\'s job, on demand ===');
+mails = []; stubFetch();
+const e9 = env(null, null);
+const t5 = await worker.fetch(new Request('https://stump.test/api/watch?run=1'), e9);
+const t5b = await t5.json();
+console.log('  status        :', t5.status, '· ran:', t5b.ran, '· first:', t5b.first);
+console.log('  mailed        :', mails.length, '·', mails[0] && mails[0].subject);
+console.log('  seeded        :', JSON.parse(e9.MARKS._dump()['watched:v1']).seeded,
+  '(this one is the real run, so it does write)');
+
 console.log('\n=== the city being down does not take the Worker with it ===');
 globalThis.fetch = async () => new Response('nope', { status: 503 });
 // configured, or the run would stop at the "nowhere to send" check above and
