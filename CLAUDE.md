@@ -12,7 +12,8 @@ iPhone, possibly moving.
 
     public/index.html   the app — HTML, CSS and JS in one file, no build
     public/match.js     the matching rules, shared by the page and the Worker
-    src/worker.js       Worker: /api/marks, /api/watch, the nightly cron
+    src/worker.js       Worker: /api/marks, /api/watch, /api/patterns, the cron
+    src/patterns.js     do saplings survive here — the analysis behind that page
     wrangler.jsonc      Worker name, KV binding, cron trigger
     test/               see "Tests" below
 
@@ -51,7 +52,7 @@ supported mode, not a broken one.
 First run fetches the map libraries from npm into `test/vendor/`
 (gitignored). The runner starts its own static server on `$PORT` (8150).
 
-19 suites. Most drive a real Chromium against the real page, stub the city's
+20 suites. Most drive a real Chromium against the real page, stub the city's
 API and the map libraries, and **print what they found rather than asserting
 silently** — the output is meant to be read, and a suite ends with `page
 errors: none` when it passed. `wlog` and `watch` are plain Node tests of the
@@ -64,7 +65,8 @@ Suites are named for what they cover: `trail` (the audit trail), `swipe`
 (one-tap tasks, geocoding), `photo`/`across` (EXIF matching), `dup`
 (duplicate detection), `keep` (reports surviving the city's data), `card`/
 `sheet`/`vec` (the bottom card and the map), `queue`, `four`, `pop`, `tidy`,
-`trim`, `third`, and `watch` for the nightly alert.
+`trim`, `third`, `watch` (the nightly alert) and `lives` (the survival
+analysis).
 
 ## The nightly watch
 
@@ -93,6 +95,30 @@ from without you owning a domain, but only to a **verified** address — so
 `NOTIFY_TO` has to be the one confirmed on the Resend account. With either
 secret missing the watch still runs and simply has nowhere to send; that is
 a supported state, logged, not a failure.
+
+## Short lives — `/api/patterns`
+
+Computed live, nothing stored, rendered as a page because it is meant to be
+read. Three things, in descending order of how much you can trust them:
+
+- **Repeat losses** — addresses with two or more removals. No matching of a
+  planting to a removal at all, so almost nothing can go wrong with it.
+- **Cohorts** — completed plantings per year, and how many of those addresses
+  saw a removal within 1/2/3 years. Has a denominator, so it is a rate.
+- **Planted then pulled** — the individual pairs. Leads, not findings.
+
+Three limits are stated on the page itself and must stay there. **311 has no
+tree identity**, so pairs are matched on address and one address can hold two
+pits. **A planting request closing is a proxy for a tree going in**, not proof.
+And the record only runs back a few years, so the only pairs visible are ones
+where planting *and* loss both fall inside the window — which is why the page
+must never report an average lifespan. That number is computable and would
+describe nothing but the dead.
+
+The confounder that would eat any finding is **emerald ash borer**: a block
+with several removals may just be a block planted with ash in the 1970s. 311
+carries no species. Chicago's street tree inventory does, and pairing the two
+is the unexplored next step.
 
 ## The environment this runs in
 

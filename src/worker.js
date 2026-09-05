@@ -14,6 +14,7 @@
  * for why they are shared with the page.
  */
 import Match from '../public/match.js';
+import Patterns from './patterns.js';
 
 const KEY = 'marks:v1';
 const JSON_HEADERS = {
@@ -194,6 +195,133 @@ async function handleMarks(request, env) {
    which the page cannot do for you because it does not know your marks
    until you open it. Here they are one KV read away. */
 
+/* ---------- the wider pull, for the patterns report ----------
+   The watch only needs six months. Asking whether saplings survive needs
+   every tree request the city has for this ward, which is a different
+   query and a much larger one — hence its own function and its own cap. */
+const PATTERN_LIMIT = 50000;
+
+async function allTreeWork(){
+  const u = new URL(SODA);
+  u.searchParams.set('$select',
+    'sr_number,sr_type,status,created_date,closed_date,street_number,' +
+    'street_direction,street_name,street_type,latitude,longitude');
+  u.searchParams.set('$where', `ward=${WARD} AND sr_type like '%Tree%'`);
+  u.searchParams.set('$limit', String(PATTERN_LIMIT));
+  const res = await fetch(u, { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error('Chicago open data returned ' + res.status);
+  const rows = await res.json();
+  // hitting the cap would silently truncate the analysis, so say so
+  return { rows, truncated: rows.length >= PATTERN_LIMIT };
+}
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* Rendered as a page rather than JSON because it is a thing to read, on a
+   phone, and because every number in it needs its caveat sitting next to
+   it rather than in someone's memory. */
+function patternsPage(r, origin){
+  const row = p => `<tr>
+    <td><b>${esc(p.address)}</b>${p.priorRemovals
+      ? `<span class="flag">lost ${p.priorRemovals + 1} now</span>` : ''}</td>
+    <td class="n">${p.gapMonths}</td>
+    <td class="d">planted ${esc(p.plantedOn)}<br>asked ${esc(p.askedOn)}</td>
+    <td class="d">${esc(p.plantedSr)}<br>${esc(p.removalSr)}</td>
+  </tr>`;
+
+  return `<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stump · short lives</title>
+<style>
+  :root{color-scheme:light}
+  body{margin:0;padding:1.1rem;background:#FCFBF7;color:#0B0B0C;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif;
+    max-width:46rem;margin-inline:auto}
+  h1{font-size:1.5rem;margin:.2rem 0 .1rem;letter-spacing:-.01em}
+  h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;
+    color:#6B6B63;margin:2.2rem 0 .5rem;font-weight:600}
+  p{margin:.5rem 0}
+  .lede{color:#4A4A44}
+  .caveat{background:#FDF6EC;border-left:4px solid #C87A16;padding:.7rem .85rem;
+    font-size:.82rem;line-height:1.6;margin:.7rem 0}
+  table{border-collapse:collapse;width:100%;font-size:.85rem;margin-top:.4rem}
+  th{text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;
+    color:#6B6B63;border-bottom:1px solid #DDD;padding:.35rem .4rem .3rem 0;font-weight:600}
+  td{border-bottom:1px solid #EEE;padding:.5rem .4rem .5rem 0;vertical-align:top}
+  td.n{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  td.d{font-size:.72rem;color:#6B6B63;font-family:ui-monospace,monospace;white-space:nowrap}
+  .flag{display:inline-block;margin-left:.45rem;padding:.05rem .35rem;background:#C87A16;
+    color:#fff;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;
+    border-radius:2px;vertical-align:1px}
+  .none{color:#6B6B63;font-style:italic}
+  .foot{margin-top:2.5rem;font-size:.75rem;color:#6B6B63;border-top:1px solid #DDD;
+    padding-top:.8rem}
+  a{color:#0B0B0C}
+</style>
+<h1>Short lives</h1>
+<p class="lede">Trees the city planted, and then was asked to take out again.
+  ${r.rows.toLocaleString()} tree requests in the 44th Ward.${
+  r.truncated ? ' <b>Truncated — the query hit its limit, so this is incomplete.</b>' : ''}</p>
+
+<div class="caveat"><b>Read these as leads, not findings.</b> 311 has no tree
+  identity — nothing links a planting to the removal of that same trunk — so
+  these are matched on address, and one parkway address can hold two pits. A
+  planting request closing is taken to mean a tree went in, which is a proxy,
+  not a fact. And the record only runs back a few years, so this can only ever
+  find trees that were <i>both</i> planted and lost inside that window. It says
+  nothing about how long trees here last.</div>
+
+<h2>Planted, then pulled — within three years</h2>
+${r.shortLives.length ? `<table>
+  <tr><th>Where</th><th>Months</th><th>When</th><th>Requests</th></tr>
+  ${r.shortLives.map(row).join('')}
+</table>` : `<p class="none">No completed planting in this data was followed by a
+  removal request at the same address within three years.</p>`}
+
+<h2>By planting year</h2>
+<p class="lede">The denominator. Without it the list above is anecdotes.</p>
+${r.cohorts.length ? `<table>
+  <tr><th>Closed</th><th>Planted</th><th>Pulled ≤1y</th><th>≤2y</th><th>≤3y</th></tr>
+  ${r.cohorts.map(c => `<tr><td>${esc(c.year)}</td><td class="n">${c.planted}</td>
+    <td class="n">${c.in12}</td><td class="n">${c.in24}</td><td class="n">${c.in36}</td></tr>`).join('')}
+</table>
+<p class="caveat">Recent years are not comparable to older ones: a tree planted
+  last year has not had three years in which to fail. Only read a column across
+  rows old enough to have finished that window.</p>` : '<p class="none">No completed plantings found.</p>'}
+
+<h2>Addresses that have lost more than one</h2>
+<p class="lede">No planting-to-removal matching here at all — just places the city
+  has been called out to twice or more. The least assumption-laden thing in this
+  report, and the most worth walking to.</p>
+${r.repeatLosses.length ? `<table>
+  <tr><th>Where</th><th>Lost</th><th>When</th></tr>
+  ${r.repeatLosses.slice(0, 60).map(c => `<tr><td><b>${esc(c.address)}</b></td>
+    <td class="n">${c.n}</td><td class="d">${c.when.map(esc).join('<br>')}</td></tr>`).join('')}
+</table>${r.repeatLosses.length > 60
+  ? `<p class="lede">…and ${r.repeatLosses.length - 60} more.</p>` : ''}`
+  : '<p class="none">No address has more than one removal on record.</p>'}
+
+<h2>What the city records here</h2>
+<table>
+  <tr><th>Request type</th><th>Count</th><th>Still open</th><th>Range</th></tr>
+  ${r.census.map(c => `<tr><td>${esc(c.type)}</td><td class="n">${c.n}</td>
+    <td class="n">${c.open}</td><td class="d">${esc(c.first)} – ${esc(c.last)}</td></tr>`).join('')}
+</table>
+<p class="lede">The date range is the honest limit on everything above. Nothing
+  planted before it can be followed here.</p>
+
+<div class="caveat"><b>One confounder worth naming.</b> Chicago lost a great many
+  ash trees to emerald ash borer. A block with several removals may not be a block
+  that kills trees — it may be a block planted with one species in the 1970s that
+  met a beetle. 311 records no species, so this report cannot tell those apart.
+  The city's street tree inventory can, and pairing the two is the next step if
+  any of this looks worth chasing.</div>
+
+<p class="foot"><a href="${esc(origin)}/">← Stump</a> · computed live from the
+  city's 311 data, nothing stored</p>`;
+}
+
 const SEEN_KEY = 'watched:v1';
 const SODA = 'https://data.cityofchicago.org/resource/v6vf-nfxy.json';
 const WARD = 44;
@@ -347,6 +475,21 @@ export default {
   async fetch(request, env) {
     const { pathname, origin } = new URL(request.url);
     if (pathname === '/api/marks') return handleMarks(request, env);
+
+    /* Do saplings survive here? Read-only, computed live, nothing kept. */
+    if (pathname === '/api/patterns') {
+      try {
+        const { rows, truncated } = await allTreeWork();
+        const within = Number(new URL(request.url).searchParams.get('within')) || 36;
+        const r = Patterns.report(rows, { truncated, within });
+        if (new URL(request.url).searchParams.get('format') === 'json') return json(r);
+        return new Response(patternsPage(r, origin), {
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
+        });
+      } catch (err) {
+        return json({ error: String(err && err.message || err) }, 502);
+      }
+    }
 
     /* A dry run of the watch, so the thing that only fires once a day can
        be looked at now. It reads the city and your marks and reports what
