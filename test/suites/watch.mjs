@@ -140,17 +140,42 @@ console.log('  sent nothing  :', mails.length === 0);
 console.log('  wrote nothing :', !e3.MARKS._dump()['watched:v1'],
   '(so it cannot silence the real run)');
 
-console.log('\n=== with no mail configured it still runs ===');
-mails = [];
+console.log('\n=== an unconfigured run must not burn the first one ===');
+/* What actually happened on the day this shipped: the cron fired before the
+   API key was in place. The old code seeded all eighteen pits and sent
+   nothing, so the run whose whole job was to prove sending works was spent
+   in silence, and every pit was marked as announced. */
+mails = []; stubFetch();
 const e4 = { MARKS: kv({}) };
 await fire(e4);
 console.log('  mails sent    :', mails.length);
-console.log('  still learned :', JSON.parse(e4.MARKS._dump()['watched:v1']).ids.length, 'pits',
-  '(so turning the key on later does not dump the backlog)');
+console.log('  remembered    :', e4.MARKS._dump()['watched:v1'] || '(nothing)',
+  '(a run that cannot tell you anything has told you nothing)');
+
+console.log('\n  and once the key arrives, it introduces itself properly');
+const e4b = env(e4.MARKS._dump(), null);
+await fire(e4b);
+console.log('  mails sent    :', mails.length);
+console.log('  subject       :', mails[0] && mails[0].subject);
+console.log('  seeded now    :', JSON.parse(e4b.MARKS._dump()['watched:v1']).seeded);
+
+console.log('\n=== and a list left by the old code heals itself ===');
+// exactly the state on the live Worker: ids, no `seeded` flag
+mails = [];
+const stale = { 'watched:v1': JSON.stringify({ at: iso(now), ids:
+  ['SR26-A','SR26-C','SR26-NEW','SR26-ASKED'] }) };
+const e4c = env(stale, null);
+await fire(e4c);
+console.log('  treated as first:', /watching/.test((mails[0] || {}).subject || ''));
+console.log('  subject         :', mails[0] && mails[0].subject);
+console.log('  seeded now      :', JSON.parse(e4c.MARKS._dump()['watched:v1']).seeded,
+  '(so it cannot happen twice)');
 
 console.log('\n=== the city being down does not take the Worker with it ===');
 globalThis.fetch = async () => new Response('nope', { status: 503 });
-const e5 = { MARKS: kv({}) };
+// configured, or the run would stop at the "nowhere to send" check above and
+// never reach the city at all — which would pass for the wrong reason
+const e5 = env(null, null);
 let threw = false;
 try { await fire(e5); } catch { threw = true; }
 console.log('  threw         :', threw);

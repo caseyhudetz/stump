@@ -262,11 +262,13 @@ function mailFor(pits, origin){
   return { subject, body };
 }
 
+const canSend = env => Boolean(env.RESEND_API_KEY && env.NOTIFY_TO);
+
 /* Resend, because it will send to a verified address without you owning a
    domain. Missing key or address is not an error: the watch simply has
    nowhere to send, says so in the log, and the rest still runs. */
 async function sendMail(env, subject, body){
-  if (!env.RESEND_API_KEY || !env.NOTIFY_TO){
+  if (!canSend(env)){
     console.log('watch: nothing to send to (set RESEND_API_KEY and NOTIFY_TO)');
     return false;
   }
@@ -290,10 +292,25 @@ async function sendMail(env, subject, body){
 async function runWatch(env, origin){
   if (!env.MARKS) return { skipped: 'no KV binding' };
 
+  /* Nowhere to send means nothing to remember. The seen list is a record of
+     what you have been *told*, so a run that cannot tell you anything must
+     not tick it forward — otherwise the backlog is silently marked as
+     announced and the first real mail is a mail about nothing. That is
+     exactly what happened the first time this shipped: the cron fired
+     before the API key was in place, seeded all eighteen pits, and burned
+     the one run whose whole job was to prove sending works. */
+  if (!canSend(env)){
+    console.log('watch: nothing to send to — leaving the record untouched');
+    return { skipped: 'not configured' };
+  }
+
   const rawSeen = await env.MARKS.get(SEEN_KEY);
   let seen = null;
   try { seen = rawSeen ? JSON.parse(rawSeen) : null; } catch { seen = null; }
-  const first = !seen || !Array.isArray(seen.ids);
+  /* `seeded` is only written by a run that could actually send, so a list
+     left behind by an unconfigured run heals itself rather than needing
+     someone to go and delete a KV key by hand. */
+  const first = !seen || !Array.isArray(seen.ids) || seen.seeded !== true;
   const known = new Set(first ? [] : seen.ids);
 
   const { pits } = await pitsWorthAVisit(env);
@@ -320,7 +337,8 @@ async function runWatch(env, origin){
   // send that failed is worth one repeat tomorrow, not a daily rerun of
   // the same list forever.
   const ids = [...new Set([...known, ...pits.map(s => s.id)])].slice(-SEEN_MAX);
-  await env.MARKS.put(SEEN_KEY, JSON.stringify({ at: new Date().toISOString(), ids }));
+  await env.MARKS.put(SEEN_KEY,
+    JSON.stringify({ at: new Date().toISOString(), seeded: true, ids }));
 
   return { first, watching: pits.length, fresh: fresh.map(s => s.id), sent };
 }
@@ -341,11 +359,16 @@ export default {
         let known = [];
         try { known = raw ? (JSON.parse(raw).ids || []) : []; } catch { known = []; }
         const fresh = pits.filter(s => !known.includes(s.id));
+        let seeded = false;
+        try { seeded = raw ? JSON.parse(raw).seeded === true : false; } catch { seeded = false; }
         return json({
           dryRun: true,
-          configured: Boolean(env.RESEND_API_KEY && env.NOTIFY_TO),
+          configured: canSend(env),
+          // an unconfigured run leaves this false, so the next configured
+          // one still gets to introduce itself
+          seeded,
           watching: pits.length,
-          alreadyTold: known.length,
+          alreadyTold: seeded ? known.length : 0,
           wouldSend: fresh.length ? mailFor(fresh, origin) : null,
           pits: fresh.map(s => ({ id: s.id, address: s.address, closed: s.closed }))
         });
